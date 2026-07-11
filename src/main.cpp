@@ -2,7 +2,7 @@
 // This software, the ideas and concepts is Copyright (c) David Bird 2021. All rights to this software are reserved.
 // #################################################################################################################
 
- //#define SERIAL_DEBUG 
+ //#define SERIAL_DEBUG
  
 #include <Arduino.h>            // In-built
 #include <esp_task_wdt.h>       // In-built
@@ -310,18 +310,23 @@ void setup() {
   InitialiseSystem();
   prefs.begin("eink", false);
   LoadConfig();
-  if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT0) {
+  esp_sleep_wakeup_cause_t wakeCause = esp_sleep_get_wakeup_cause();
+  if (wakeCause == ESP_SLEEP_WAKEUP_EXT0) {
     if (ButtonHeldLong()) StartConfigPortal(); // ilgas paspaudimas -> nustatymai (ir restart)
     else                  WifeMode = !WifeMode; // trumpas -> perjungti režimą
   }
+  // Mygtukas ar įjungimas -> atnaujinti bet kada; tik planinis (taimerio) žadinimas paiso nakties lango
+  bool forceRefresh = (wakeCause != ESP_SLEEP_WAKEUP_TIMER);
   ChillBias = prefs.getFloat("chillBias", -2.0);
   ReadBattery();
   if (StartWiFi() == WL_CONNECTED && SetupTime() == true) {
-    bool WakeUp = false;                
-    if (WakeupHour > SleepHour)
-      WakeUp = (CurrentHour >= WakeupHour || CurrentHour <= SleepHour); 
-    else                             
-      WakeUp = (CurrentHour >= WakeupHour && CurrentHour <= SleepHour);                              
+    bool WakeUp = forceRefresh;
+    if (!WakeUp) {
+      if (WakeupHour > SleepHour)
+        WakeUp = (CurrentHour >= WakeupHour || CurrentHour <= SleepHour);
+      else
+        WakeUp = (CurrentHour >= WakeupHour && CurrentHour <= SleepHour);
+    }
     if (WakeUp) {
       byte Attempts = 1;
       bool RxWeather  = false;
