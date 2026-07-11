@@ -22,3 +22,10 @@ const char* Timezone    = "EET-2EEST,M3.5.0/3,M10.5.0/4";  // https://github.com
 const char* ntpServer   = "0.europe.pool.ntp.org";
 int   gmtOffset_sec     = 0;
 int  daylightOffset_sec = 3600;
+
+// --- Telegram (grįžtamasis ryšys ir baterijos perspėjimas) ---
+// Token gaunamas telefone per @BotFather (komanda /newbot). Kol tuščias - Telegram funkcijos išjungtos.
+const char* telegramBotToken = "";
+// Chat ID galima palikti tuščią: įrenginys pats įsimins pirmą parašiusį žmogų (parašykite botui bet ką).
+const char* telegramChatID   = "";
+const int   FeedbackHour     = 20;  // kurią valandą klausti "ar tiko apranga?"

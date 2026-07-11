@@ -18,6 +18,8 @@
 
 #include <WiFi.h>               // In-built
 #include <WiFiManager.h>        // https://github.com/tzapu/WiFiManager - AP konfigūravimo portalas
+#include <WiFiClientSecure.h>   // In-built - HTTPS ryšiui su Telegram API
+#include <Preferences.h>        // In-built - NVS: šalčmyrės koeficientas, Telegram chat ID ir offset
 #include <SPI.h>                // In-built
 #include <time.h>               // In-built
 
@@ -90,6 +92,14 @@ uint8_t *framebuffer;
 
 // Paprastasis ("žmonos") režimas: išlieka per gilų miegą RTC atmintyje, perjungiamas plokštės mygtuku
 RTC_DATA_ATTR bool WifeMode = false;
+
+// Telegram grįžtamasis ryšys
+RTC_DATA_ATTR int LastAskDay       = -1; // kad vakarinis klausimas būtų siunčiamas tik kartą per dieną
+RTC_DATA_ATTR int LastBattAlertDay = -1; // kad baterijos perspėjimas nesikartotų kas 30 min.
+float ChillBias = -2.0;                  // šalčmyrės korekcija °C; koreguojama pagal atsakymus, saugoma NVS
+int   BatteryPct = -1;                   // -1 = nenuskaityta
+float BatteryVoltage = 0;
+Preferences prefs;
 
 
 void BeginSleep() {
@@ -210,6 +220,9 @@ void loop() {
 void setup() {
   InitialiseSystem();
   if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT0) WifeMode = !WifeMode; // mygtukas perjungia režimą
+  prefs.begin("eink", false);
+  ChillBias = prefs.getFloat("chillBias", -2.0);
+  ReadBattery();
   if (StartWiFi() == WL_CONNECTED && SetupTime() == true) {
     bool WakeUp = false;                
     if (WakeupHour > SleepHour)
@@ -230,6 +243,7 @@ void setup() {
        DBG("Received all weather data...");
       #endif
       if (RxWeather && RxForecast) { // Only if received both Weather or Forecast proceed
+        TelegramSync();     // Atsakymai, koeficiento korekcija, perspėjimai - kol WiFi dar veikia
         StopWiFi();         // Reduces power consumption
         epd_poweron();      // Switch on EPD display
         epd_clear();        // Clear the screen
@@ -434,6 +448,104 @@ double NormalizedMoonPhase(int d, int m, int y) {
   return (Phase - (int) Phase);
 }
 
+//################ TELEGRAM: GRĮŽTAMASIS RYŠYS IR PERSPĖJIMAI #############################
+// Vakare botas paklausia "ar tiko apranga?" su mygtukais Šalta/Kaip tik/Karšta.
+// Atsakymai nuskaitomi kito pabudimo metu ir koreguoja ChillBias koeficientą (saugomas NVS).
+// Taip pat siunčiamas perspėjimas, kai baterija <= 10%.
+
+String TgApiCall(const String& method, const String& jsonBody) {
+  WiFiClientSecure client;
+  client.setInsecure(); // sertifikato netikrinam - pakanka slapto boto tokeno URL
+  HTTPClient https;
+  https.setTimeout(10000);
+  if (!https.begin(client, "https://api.telegram.org/bot" + String(telegramBotToken) + "/" + method)) return "";
+  int code;
+  if (jsonBody.length() > 0) {
+    https.addHeader("Content-Type", "application/json");
+    code = https.POST(jsonBody);
+  }
+  else code = https.GET();
+  String resp = (code > 0) ? https.getString() : "";
+  DBG("TG " + method.substring(0, method.indexOf('?') > 0 ? method.indexOf('?') : method.length()) + " -> " + String(code));
+  https.end();
+  return resp;
+}
+
+void TgSendMessage(const String& chatId, const String& text, bool withButtons) {
+  DynamicJsonDocument doc(2048);
+  doc["chat_id"] = chatId;
+  doc["text"] = text;
+  if (withButtons) {
+    JsonArray row = doc["reply_markup"]["inline_keyboard"].createNestedArray();
+    JsonObject b1 = row.createNestedObject(); b1["text"] = "🥶 Buvo šalta"; b1["callback_data"] = "FB_COLD";
+    JsonObject b2 = row.createNestedObject(); b2["text"] = "👍 Kaip tik";   b2["callback_data"] = "FB_OK";
+    JsonObject b3 = row.createNestedObject(); b3["text"] = "🥵 Buvo karšta"; b3["callback_data"] = "FB_HOT";
+  }
+  String body;
+  serializeJson(doc, body);
+  TgApiCall("sendMessage", body);
+}
+
+void ApplyFeedback(const String& data, const String& chatId) {
+  float delta = 0;
+  String reply;
+  if      (data == "FB_COLD") { delta = -0.5; reply = "Užrašiau! 🧣 Nuo šiol patarimai bus šiltesni."; }
+  else if (data == "FB_HOT")  { delta = +0.5; reply = "Supratau! 😎 Kitąkart siūlysiu rengtis lengviau."; }
+  else if (data == "FB_OK")   {               reply = "Puiku, vadinasi pataikėm! 🎯"; }
+  else return;
+  if (delta != 0) {
+    ChillBias = constrain(ChillBias + delta, -5.0f, 1.0f);
+    prefs.putFloat("chillBias", ChillBias);
+  }
+  TgSendMessage(chatId, reply, false);
+}
+
+void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
+  if (strlen(telegramBotToken) == 0) return;
+  String chatId = prefs.getString("chatId", String(telegramChatID));
+  long offset = prefs.getLong("tgOffset", 0);
+  // 1. Pasiimti naujus atsakymus/žinutes
+  String resp = TgApiCall("getUpdates?offset=" + String(offset) + "&limit=20&timeout=0", "");
+  if (resp.length() > 0) {
+    DynamicJsonDocument doc(16 * 1024);
+    if (deserializeJson(doc, resp) == DeserializationError::Ok && doc["ok"] == true) {
+      for (JsonObject upd : doc["result"].as<JsonArray>()) {
+        long updId = upd["update_id"].as<long>();
+        if (updId >= offset) offset = updId + 1;
+        if (upd.containsKey("callback_query")) { // mygtuko paspaudimas
+          String data = upd["callback_query"]["data"].as<const char*>();
+          String cid;  serializeJson(upd["callback_query"]["message"]["chat"]["id"], cid);
+          String cbId = upd["callback_query"]["id"].as<const char*>();
+          TgApiCall("answerCallbackQuery?callback_query_id=" + cbId, "");
+          if (chatId.length() == 0) { chatId = cid; prefs.putString("chatId", chatId); }
+          ApplyFeedback(data, cid);
+        }
+        else if (upd.containsKey("message")) { // pirma žinutė botui - įsimenam chat ID
+          String cid; serializeJson(upd["message"]["chat"]["id"], cid);
+          if (chatId.length() == 0) {
+            chatId = cid;
+            prefs.putString("chatId", chatId);
+            TgSendMessage(chatId, "Sveiki! Čia jūsų orų stotelė 🌤 Vakarais paklausiu, ar tiko apranga - taip mokysiuos patarinėti geriau.", false);
+          }
+        }
+      }
+      prefs.putLong("tgOffset", offset);
+    }
+  }
+  if (chatId.length() == 0) return; // dar niekas nerašė botui
+  int today = (int)(time(NULL) / 86400);
+  // 2. Baterijos perspėjimas (kartą per dieną)
+  if (BatteryPct >= 0 && BatteryPct <= 10 && LastBattAlertDay != today) {
+    TgSendMessage(chatId, "🪫 Baterija liko " + String(BatteryPct) + "% (" + String(BatteryVoltage, 2) + " V) - laikas pakrauti!", false);
+    LastBattAlertDay = today;
+  }
+  // 3. Vakarinis klausimas apie aprangą (kartą per dieną)
+  if (CurrentHour == FeedbackHour && LastAskDay != today) {
+    TgSendMessage(chatId, "Kaip šiandien tiko apranga pagal mano patarimą? 🙂", true);
+    LastAskDay = today;
+  }
+}
+
 //################ PAPRASTASIS ("ŽMONOS") REŽIMAS ########################################
 // Perjungiamas plokštės mygtuku (GPIO21). Be grafikų: temperatūra, jutiminė temperatūra,
 // šmaikštus patarimas kaip rengtis ir dienos eiga (rytas/diena/vakaras).
@@ -445,7 +557,7 @@ struct ClothingAdvice {
 
 ClothingAdvice GetClothingAdvice() {
   ClothingAdvice a = {"", false, false, false, false, false};
-  float feels = WxConditions[0].Feelslike - 2.0; // šalčmyrės korekcija: patarimai puse laiptelio šilčiau
+  float feels = WxConditions[0].Feelslike + ChillBias; // šalčmyrės korekcija: mokosi iš Telegram atsakymų
   bool rainy  = (WxConditions[0].Rainfall > 0.1) || (WxForecast[0].Pop >= 0.35) || (WxForecast[1].Pop >= 0.35);
   bool snowy  = (WxConditions[0].Snowfall > 0.05) || (WxForecast[0].Snowfall > 0.1);
   bool windy  = (WxConditions[0].Windspeed >= 8);
@@ -991,35 +1103,35 @@ boolean UpdateLocalTime() {
   return true;
 }
 
-void DrawBattery(int x, int y) {
-  uint8_t percentage = 100;   
+void ReadBattery() { // Nuskaito ADC ir užpildo BatteryPct/BatteryVoltage (naudoja ir ekranas, ir Telegram perspėjimas)
   esp_adc_cal_characteristics_t adc_chars;
   //Slopinimas orig DB_11
   esp_adc_cal_value_t val_type = esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_12, ADC_WIDTH_BIT_12, 0, &adc_chars);
-  //esp_adc_cal_value_t val_type = esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 1100, &adc_chars);
   if (val_type == ESP_ADC_CAL_VAL_EFUSE_VREF) {
-    #ifdef SERIAL_DEBUG 
+    #ifdef SERIAL_DEBUG
       Serial.printf("eFuse Vref:%u mV", adc_chars.vref);
     #endif
     vref = adc_chars.vref;
   }
-  
   //VS MOD
-  //float voltage = analogRead(14) / 4096.0 * 6.566 * (vref / 1000.0); // VS 14 PIN
   float voltage = analogRead(14) / 4096.0 * 6.100 * (vref / 1000.0); // VS 14 PIN
-  if (voltage > 1 ) { // Only display if there is a valid reading
-    #ifdef SERIAL_DEBUG 
-     DBG("\nVoltage = " + String(voltage));
-    #endif
+  if (voltage > 1) { // Only valid reading
+    DBG("\nVoltage = " + String(voltage));
     int pct = 2836.9625 * pow(voltage, 4) - 43987.4889 * pow(voltage, 3) + 255233.8134 * pow(voltage, 2) - 656689.7123 * voltage + 632041.7303;
     if (voltage >= 4.20) pct = 100;
     if (voltage <= 3.20) pct = 0;  // orig 3.5
-    percentage = constrain(pct, 0, 100); // polinomas gali duoti <0 arba >100, uint8_t apsivyniotų
-    drawRect(x + 25, y - 14, 40, 15, Black);
-    fillRect(x + 65, y - 10, 4, 7, Black);
-    fillRect(x + 27, y - 12, 36 * percentage / 100.0, 11, Black);
-    drawString(x + 85, y - 14, String(percentage) + "%  " + String(voltage, 2) + "v", LEFT);
+    BatteryPct = constrain(pct, 0, 100); // polinomas gali duoti <0 arba >100
+    BatteryVoltage = voltage;
   }
+  else BatteryPct = -1;
+}
+
+void DrawBattery(int x, int y) {
+  if (BatteryPct < 0) return; // nėra korektiško nuskaitymo
+  drawRect(x + 25, y - 14, 40, 15, Black);
+  fillRect(x + 65, y - 10, 4, 7, Black);
+  fillRect(x + 27, y - 12, 36 * BatteryPct / 100.0, 11, Black);
+  drawString(x + 85, y - 14, String(BatteryPct) + "%  " + String(BatteryVoltage, 2) + "v", LEFT);
 }
 
 // Symbols are drawn on a relative 10x10grid and 1 scale unit = 1 drawing unit
