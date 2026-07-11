@@ -101,6 +101,11 @@ int   BatteryPct = -1;                   // -1 = nenuskaityta
 float BatteryVoltage = 0;
 Preferences prefs;
 
+// Konfigūracija, keičiama per web portalą (ilgas mygtuko paspaudimas). Numatytos reikšmės
+// iš owm_credentials.h, tikrosios užkraunamos iš NVS per LoadConfig().
+String TgToken;      // Telegram bot token (perrašo const telegramBotToken)
+int    FeedbackHr;   // vakarinio klausimo valanda (perrašo const FeedbackHour)
+
 
 void BeginSleep() {
   epd_poweroff_all();
@@ -191,9 +196,93 @@ uint8_t StartWiFi() {
 void StopWiFi() {
   WiFi.disconnect();
   WiFi.mode(WIFI_OFF);
-  #ifdef SERIAL_DEBUG 
+  #ifdef SERIAL_DEBUG
     DBG("WiFi switched Off");
   #endif
+}
+
+//################ KONFIGŪRACIJA (WEB PORTALAS) #########################################
+// Nustatymai (API raktas, lokacija, naktinis režimas, Telegram) keičiami per naršyklę.
+// Portalas atidaromas ilgu (>3 s) plokštės mygtuko paspaudimu. Reikšmės saugomos NVS.
+
+void LoadConfig() { // NVS reikšmės perrašo owm_credentials.h numatytąsias
+  apikey     = prefs.getString("apikey",   apikey);
+  City       = prefs.getString("city",     City);
+  Country    = prefs.getString("country",  Country);
+  WakeupHour = prefs.getInt("wakeHour",    WakeupHour);
+  SleepHour  = prefs.getInt("sleepHour",   SleepHour);
+  TgToken    = prefs.getString("tgToken",  String(telegramBotToken));
+  FeedbackHr = prefs.getInt("fbHour",      FeedbackHour);
+}
+
+bool ButtonHeldLong() { // true, jei mygtukas laikomas ilgiau nei 3 s (konfigūracijos režimas)
+  pinMode(BUTTON_1, INPUT_PULLUP);
+  unsigned long start = millis();
+  while (digitalRead(BUTTON_1) == LOW) { // aktyvus žemas
+    if (millis() - start > 3000) return true;
+    delay(50);
+  }
+  return false;
+}
+
+static bool cfgSaved = false;
+void OnSaveConfigParams() { cfgSaved = true; }
+
+void ConfigPortalScreen() { // instrukcijos e-ink ekrane konfigūracijos metu
+  epd_poweron();
+  epd_clear();
+  setFont(&OpenSans18B);
+  drawString(SCREEN_WIDTH / 2, 110, "Nustatymų režimas", CENTER);
+  setFont(&OpenSans12B);
+  drawString(SCREEN_WIDTH / 2, 185, "1. Telefonu prisijunkite prie WiFi tinklo:", CENTER);
+  setFont(&OpenSans18B);
+  drawString(SCREEN_WIDTH / 2, 225, String(WIFI_AP_NAME), CENTER);
+  setFont(&OpenSans12B);
+  drawString(SCREEN_WIDTH / 2, 285, "2. Naršyklėje atidarykite: 192.168.4.1", CENTER);
+  drawString(SCREEN_WIDTH / 2, 320, "3. \"Setup\" - API raktas, miestas, nakties laikas, Telegram", CENTER);
+  drawString(SCREEN_WIDTH / 2, 355, "   \"Configure WiFi\" - pakeisti tinklą", CENTER);
+  drawString(SCREEN_WIDTH / 2, 430, "Portalas veiks 5 minutes, po to įrenginys pasileis iš naujo", CENTER);
+  edp_update();
+  epd_poweroff_all();
+}
+
+void StartConfigPortal() { // blokuojanti; po išsaugojimo įrenginys pasileidžia iš naujo
+  ConfigPortalScreen();
+  WiFi.mode(WIFI_STA);
+  WiFiManager wm;
+  #ifndef SERIAL_DEBUG
+    wm.setDebugOutput(false);
+  #endif
+  WiFiManagerParameter p_api("apikey", "OWM API raktas", apikey.c_str(), 40);
+  WiFiManagerParameter p_city("city", "Miestas", City.c_str(), 40);
+  WiFiManagerParameter p_country("country", "Šalies kodas (pvz. LT)", Country.c_str(), 6);
+  WiFiManagerParameter p_wake("wakeHour", "Ryto pradžia, val. (0-23)", String(WakeupHour).c_str(), 4);
+  WiFiManagerParameter p_sleep("sleepHour", "Nakties pradžia, val. (0-23)", String(SleepHour).c_str(), 4);
+  WiFiManagerParameter p_tg("tgToken", "Telegram bot token (nebūtina)", TgToken.c_str(), 64);
+  WiFiManagerParameter p_fb("fbHour", "Klausimo apie aprangą valanda (0-23)", String(FeedbackHr).c_str(), 4);
+  wm.addParameter(&p_api);
+  wm.addParameter(&p_city);
+  wm.addParameter(&p_country);
+  wm.addParameter(&p_wake);
+  wm.addParameter(&p_sleep);
+  wm.addParameter(&p_tg);
+  wm.addParameter(&p_fb);
+  cfgSaved = false;
+  wm.setSaveParamsCallback(OnSaveConfigParams);
+  std::vector<const char*> menu = {"wifi", "param", "info", "sep", "restart", "exit"};
+  wm.setMenu(menu);
+  wm.setConfigPortalTimeout(300);
+  wm.startConfigPortal(WIFI_AP_NAME); // blokuoja, kol išsaugoma arba baigiasi laikas
+  if (cfgSaved) {
+    prefs.putString("apikey",  p_api.getValue());
+    prefs.putString("city",    p_city.getValue());
+    prefs.putString("country", p_country.getValue());
+    prefs.putInt("wakeHour",   constrain(atoi(p_wake.getValue()), 0, 23));
+    prefs.putInt("sleepHour",  constrain(atoi(p_sleep.getValue()), 0, 23));
+    prefs.putString("tgToken", p_tg.getValue());
+    prefs.putInt("fbHour",     constrain(atoi(p_fb.getValue()), 0, 23));
+  }
+  ESP.restart(); // nauji nustatymai įsigalioja po perkrovimo
 }
 
 void InitialiseSystem() {
@@ -219,8 +308,12 @@ void loop() {
 
 void setup() {
   InitialiseSystem();
-  if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT0) WifeMode = !WifeMode; // mygtukas perjungia režimą
   prefs.begin("eink", false);
+  LoadConfig();
+  if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT0) {
+    if (ButtonHeldLong()) StartConfigPortal(); // ilgas paspaudimas -> nustatymai (ir restart)
+    else                  WifeMode = !WifeMode; // trumpas -> perjungti režimą
+  }
   ChillBias = prefs.getFloat("chillBias", -2.0);
   ReadBattery();
   if (StartWiFi() == WL_CONNECTED && SetupTime() == true) {
@@ -458,7 +551,7 @@ String TgApiCall(const String& method, const String& jsonBody) {
   client.setInsecure(); // sertifikato netikrinam - pakanka slapto boto tokeno URL
   HTTPClient https;
   https.setTimeout(10000);
-  if (!https.begin(client, "https://api.telegram.org/bot" + String(telegramBotToken) + "/" + method)) return "";
+  if (!https.begin(client, "https://api.telegram.org/bot" + TgToken + "/" + method)) return "";
   int code;
   if (jsonBody.length() > 0) {
     https.addHeader("Content-Type", "application/json");
@@ -501,7 +594,7 @@ void ApplyFeedback(const String& data, const String& chatId) {
 }
 
 void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
-  if (strlen(telegramBotToken) == 0) return;
+  if (TgToken.length() == 0) return;
   String chatId = prefs.getString("chatId", String(telegramChatID));
   long offset = prefs.getLong("tgOffset", 0);
   // 1. Pasiimti naujus atsakymus/žinutes
@@ -540,7 +633,7 @@ void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
     LastBattAlertDay = today;
   }
   // 3. Vakarinis klausimas apie aprangą (kartą per dieną)
-  if (CurrentHour == FeedbackHour && LastAskDay != today) {
+  if (CurrentHour == FeedbackHr && LastAskDay != today) {
     TgSendMessage(chatId, "Kaip šiandien tiko apranga pagal mano patarimą? 🙂", true);
     LastAskDay = today;
   }
@@ -693,11 +786,13 @@ void DisplayWifeMode() {
   drawLine(5, 45, 955, 45, Grey);
   // Didelė orų piktograma kairėje
   DisplayConditionsSection(150, 160, WxConditions[0].Icon, LargeIcon);
-  // Temperatūra ir jutiminė
-  setFont(&OpenSans48B);
-  drawString(430, 70, String(WxConditions[0].Temperature, 0) + "°", CENTER);
+  // Didelis skaičius - JUTIMINĖ temperatūra (kaip iš tikrųjų jaučiasi); mažas - termometro rodmuo
   setFont(&OpenSans18B);
-  drawString(430, 190, "Jutiminė " + String(WxConditions[0].Feelslike, 0) + "°", CENTER);
+  drawString(430, 45, "jaučiasi kaip", CENTER);
+  setFont(&OpenSans48B);
+  drawString(430, 90, String(WxConditions[0].Feelslike, 0) + "°", CENTER);
+  setFont(&OpenSans18B);
+  drawString(430, 200, "termometras rodo " + String(WxConditions[0].Temperature, 0) + "°", CENTER);
   // Dešinysis stulpelis: min/maks, vėjas, lietaus tikimybė
   setFont(&OpenSans12B);
   drawString(700, 85,  "Maks " + String(WxConditions[0].High, 0) + "°   Min " + String(WxConditions[0].Low, 0) + "°", LEFT);

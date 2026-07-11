@@ -32,12 +32,16 @@ atsidarys konfigūravimo portalas.
 
 ## 3. Du režimai: pilnas ir paprastasis
 
-Įrenginys turi du ekranus, perjungiamus **plokštės mygtuku** (šoninis mygtukas, ne RESET):
+Įrenginys turi du ekranus, perjungiamus **trumpu plokštės mygtuko paspaudimu** (šoninis
+mygtukas, ne RESET):
 
 - **Pilnas** — visa informacija su grafikais (aprašyta žemiau).
-- **Paprastasis** — didelė temperatūra, jutiminė temperatūra, šmaikštus patarimas,
-  kaip šiandien rengtis (su drabužių piktogramomis: maikutė, megztinis, striukė, kepurė,
-  skėtis), ir dienos eiga: rytas / diena / vakaras.
+- **Paprastasis** — **jutiminė** temperatūra dideliu skaičiumi („jaučiasi kaip"), termometro
+  rodmuo mažesniu, šmaikštus patarimas, kaip šiandien rengtis (su drabužių piktogramomis:
+  maikutė, megztinis, striukė, kepurė, skėtis), ir dienos eiga: rytas / diena / vakaras.
+
+> Didelis skaičius rodo, kaip oras **jaučiasi** (su vėju ir drėgme), o ne teorinį termometro
+> rodmenį — būtent tai svarbu renkantis, kaip rengtis.
 
 Paspaudus mygtuką įrenginys pabunda, parsisiunčia šviežius orus ir perpiešia ekraną kitu
 režimu (užtrunka ~20–30 s — e-ink lėtas, bet taupus). Pasirinktas režimas įsimenamas ir
@@ -45,7 +49,7 @@ išlieka per visus miego ciklus; atjungus maitinimą grįžtama į pilną režim
 
 Patarimai „kaip rengtis" specialiai sukalibruoti šalčio nemėgstantiems: rekomendacijos
 visada puse laiptelio šiltesnės, frazės keičiasi kasdien, o pats „šilumos koeficientas"
-mokosi iš jūsų atsakymų Telegram'e (žr. 5 skyrių).
+mokosi iš jūsų atsakymų Telegram'e (žr. 6 skyrių).
 
 ## 4. Ekrano elementai (pilnas režimas)
 
@@ -59,9 +63,27 @@ mokosi iš jūsų atsakymų Telegram'e (žr. 5 skyrių).
 | Vidurys | 3 parų prognozė kas 3 val. (laikas, piktograma, temperatūra) |
 | Apačia | 4 grafikai: slėgis, temperatūra, lietus ir **sniegas arba drėgnumas** (sniego grafikas rodomas tik kai prognozuojamas sniegas; kitu atveju — drėgnumas) |
 
-## 5. Telegram: „ar tiko apranga?" ir baterijos perspėjimai
+## 5. Nustatymai per naršyklę (API raktas, lokacija, naktinis režimas)
 
-Stotelė gali bendrauti per Telegram botą (žr. įjungimą 8 skyriuje):
+Visus nustatymus galima pakeisti telefonu, nieko neredaguojant kode:
+
+1. **Palaikykite plokštės mygtuką nuspaustą ~3 sekundes** (ne RESET). Ekrane pasirodys
+   „Nustatymų režimas" su instrukcijomis.
+2. Telefonu prisijunkite prie WiFi tinklo **`OruStotele-Setup`** ir naršyklėje atidarykite
+   **`192.168.4.1`**.
+3. Meniu pasirinkite:
+   - **„Setup"** — įveskite OWM API raktą, miestą, šalies kodą, ryto ir nakties pradžios
+     valandas (naktį įrenginys nesirefreshina — miega iki ryto), Telegram token'ą ir klausimo
+     valandą. Spauskite *Save*.
+   - **„Configure WiFi"** — jei norite pakeisti WiFi tinklą.
+4. Išsaugojus įrenginys pats pasileidžia iš naujo su naujais nustatymais.
+
+Portalas veikia 5 minutes; jei nieko neišsaugosite, įrenginys grįžta į įprastą darbą.
+Nustatymai saugomi įrenginio atmintyje ir išlieka atjungus maitinimą.
+
+## 6. Telegram: „ar tiko apranga?" ir baterijos perspėjimai
+
+Stotelė gali bendrauti per Telegram botą (įjungimas — šio skyriaus pabaigoje):
 
 - **Vakare (20:00)** botas atsiunčia klausimą *„Kaip šiandien tiko apranga pagal mano
   patarimą?"* su mygtukais: 🥶 Buvo šalta / 👍 Kaip tik / 🥵 Buvo karšta.
@@ -82,14 +104,14 @@ maitinimą.
 3. Telegram'e susiraskite savo naują botą ir parašykite jam bet ką (pvz., „labas").
    Stotelė per artimiausią pabudimą įsimins jūsų chat ID ir prisistatys.
 
-## 6. Baterija
+## 7. Baterija
 
 - Li-ion / LiPo baterija kraunama per USB-C jungtį.
 - 100 % ≈ 4,2 V, 0 % ≈ 3,2 V. Rodoma viršuje dešinėje.
 - Su 30 min. intervalu ir nakties miegu baterijos paprastai užtenka keliems mėnesiams
   (priklauso nuo talpos ir WiFi signalo stiprumo).
 
-## 7. Trikčių šalinimas
+## 8. Trikčių šalinimas
 
 | Problema | Sprendimas |
 |---|---|
@@ -100,7 +122,7 @@ maitinimą.
 | Klaustukas vietoj orų piktogramos | OWM grąžino nežinomą piktogramos kodą — praeis su kitu atsinaujinimu |
 | Botas neatsako / klausimų nesiunčia | Patikrinkite `telegramBotToken`; parašykite botui žinutę, kad įsimintų chat ID |
 
-## 8. Programuotojui
+## 9. Programuotojui
 
 ### Aplinka
 - VS Code + PlatformIO, plokštė `esp32-s3-devkitc-1` (16 MB flash, PSRAM).
@@ -109,7 +131,7 @@ maitinimą.
 ### Konfigūracija
 - Nukopijuokite `include/owm_credentials_template.h` → `include/owm_credentials.h`
   ir įrašykite savo OWM API raktą (nemokamas: https://openweathermap.org/) bei
-  Telegram boto token'ą (žr. 5 skyrių). Šis failas yra `.gitignore` sąraše —
+  Telegram boto token'ą (žr. 6 skyrių). Šis failas yra `.gitignore` sąraše —
   slaptažodžiai į git nekeliauja.
 - Miestas, laiko juosta, kalba, klausimo valanda (`FeedbackHour`) — tame pačiame faile.
 - Miego intervalas ir veikimo langas — `SleepDuration`, `WakeupHour`, `SleepHour`
@@ -130,9 +152,11 @@ Pergeneravimas (pvz., pakeitus šriftą ar dydį):
 Išvestį išsaugoti UTF-8 formatu į `include/opensans12b.h`. Norint autentiško Open Sans —
 atsisiųskite `OpenSans-Bold.ttf` ir nurodykite jį vietoj `segoeuib.ttf`.
 
-## 9. Versijų istorija
+## 10. Versijų istorija
 
-- **2026-07** — Telegram grįžtamasis ryšys („ar tiko apranga?") su savaime besimokančiu
+- **2026-07** — nustatymai per naršyklę (ilgas mygtuko paspaudimas: API raktas, lokacija,
+  naktinis režimas, Telegram); žmonos režime dideliu fontu rodoma jutiminė temperatūra;
+  Telegram grįžtamasis ryšys („ar tiko apranga?") su savaime besimokančiu
   šilumos koeficientu ir baterijos perspėjimu; paprastasis („žmonos") režimas su aprangos
   patarimais, perjungiamas mygtuku; WiFiManager konfigūravimo portalas; lietuviškos raidės
   ekrane (ą, č, ę, ė, į, š, ų, ū, ž); lietuviškos vėjo kryptys; pataisyta klaida, dėl kurios
@@ -141,7 +165,7 @@ atsisiųskite `OpenSans-Bold.ttf` ir nurodykite jį vietoj `segoeuib.ttf`.
 - **Bazinė versija** — D. Bird LilyGo-EPD-4-7-OWM-Weather-Display v2.5 su mmHg ir
   baterijos kalibracijos modifikacijomis.
 
-## 10. Planuojamos funkcijos
+## 11. Planuojamos funkcijos
 
 - Atsakymų istorijos žurnalas SD kortelėje (su užpildymo priežiūra) — detalesnei
   koeficiento analizei pagal sezonus ir temperatūrų juostas.

@@ -19,9 +19,10 @@
   <g stroke="#1c1c1a" stroke-width="4" stroke-linecap="round">
     <line x1="110" y1="210" x2="100" y2="232"/><line x1="145" y1="210" x2="135" y2="232"/><line x1="180" y1="210" x2="170" y2="232"/>
   </g>
-  <!-- Temperatura -->
-  <text x="430" y="150" font-size="105" font-weight="bold" fill="#1c1c1a" text-anchor="middle">16°</text>
-  <text x="430" y="205" font-size="27" fill="#1c1c1a" text-anchor="middle">Jutiminė 14°</text>
+  <!-- Temperatura: didelis skaicius = jutimine (kaip jauciasi), mazas = termometras -->
+  <text x="430" y="72" font-size="24" fill="#5f5e5a" text-anchor="middle">jaučiasi kaip</text>
+  <text x="430" y="165" font-size="100" font-weight="bold" fill="#1c1c1a" text-anchor="middle">14°</text>
+  <text x="430" y="210" font-size="24" fill="#5f5e5a" text-anchor="middle">termometras rodo 16°</text>
   <!-- Desinysis stulpelis -->
   <text x="680" y="105" font-size="22" fill="#1c1c1a">Maks 18°   Min 12°</text>
   <text x="680" y="147" font-size="22" fill="#1c1c1a">Vėjas 5 m/s ŠV</text>
