@@ -54,28 +54,29 @@
     <line x1="325" y1="305" x2="325" y2="340"/>
     <path d="M325 340 a8 8 0 0 1 -16 0"/>
   </g>
-  <text x="395" y="282" font-size="15" fill="#5f5e5a" letter-spacing="1">KAIP RENGTIS</text>
-  <text x="395" y="318" font-size="26" font-weight="bold" fill="#1c1c1a">Dangus šiandien verkia — megztinis, ant viršaus</text>
-  <text x="395" y="352" font-size="26" font-weight="bold" fill="#1c1c1a">striukė, o skėtis bus geriausias draugas</text>
+  <text x="395" y="280" font-size="15" fill="#5f5e5a" letter-spacing="1">KAIP RENGTIS</text>
+  <text x="395" y="312" font-size="24" font-weight="bold" fill="#1c1c1a">Dangus šiandien verkia — megztinis,</text>
+  <text x="395" y="344" font-size="24" font-weight="bold" fill="#1c1c1a">ant viršaus striukė, o skėtis</text>
+  <text x="395" y="376" font-size="24" font-weight="bold" fill="#1c1c1a">bus geriausias draugas</text>
   <!-- Dienos eiga -->
-  <g font-size="20" fill="#1c1c1a" text-anchor="middle">
-    <text x="190" y="430" font-weight="bold">Rytas</text>
-    <text x="480" y="430" font-weight="bold">Diena</text>
-    <text x="770" y="430" font-weight="bold">Vakaras</text>
-    <text x="190" y="505" font-size="26" font-weight="bold">13°</text>
-    <text x="480" y="505" font-size="26" font-weight="bold">16°</text>
-    <text x="770" y="505" font-size="26" font-weight="bold">14°</text>
+  <g font-size="19" fill="#1c1c1a" text-anchor="middle">
+    <text x="190" y="425" font-weight="bold">Rytas</text>
+    <text x="480" y="425" font-weight="bold">Diena</text>
+    <text x="770" y="425" font-weight="bold">Vakaras</text>
+    <text x="255" y="472" font-size="26" font-weight="bold">13°</text>
+    <text x="550" y="472" font-size="26" font-weight="bold">16°</text>
+    <text x="835" y="472" font-size="26" font-weight="bold">14°</text>
   </g>
   <g stroke="#1c1c1a" stroke-width="2.5" fill="#ffffff">
-    <path d="M168 460 a13 13 0 0 1 13 -11 a15 15 0 0 1 29 3 a11 11 0 0 1 -2 22 l-38 0 a12 12 0 0 1 -2 -14"/>
-    <path d="M458 460 a13 13 0 0 1 13 -11 a15 15 0 0 1 29 3 a11 11 0 0 1 -2 22 l-38 0 a12 12 0 0 1 -2 -14"/>
-    <path d="M748 460 a13 13 0 0 1 13 -11 a15 15 0 0 1 29 3 a11 11 0 0 1 -2 22 l-38 0 a12 12 0 0 1 -2 -14"/>
+    <path d="M168 458 a13 13 0 0 1 13 -11 a15 15 0 0 1 29 3 a11 11 0 0 1 -2 22 l-38 0 a12 12 0 0 1 -2 -14"/>
+    <path d="M458 458 a13 13 0 0 1 13 -11 a15 15 0 0 1 29 3 a11 11 0 0 1 -2 22 l-38 0 a12 12 0 0 1 -2 -14"/>
+    <path d="M748 458 a13 13 0 0 1 13 -11 a15 15 0 0 1 29 3 a11 11 0 0 1 -2 22 l-38 0 a12 12 0 0 1 -2 -14"/>
   </g>
   <g stroke="#1c1c1a" stroke-width="2" stroke-linecap="round">
-    <line x1="470" y1="480" x2="466" y2="490"/><line x1="482" y1="480" x2="478" y2="490"/><line x1="494" y1="480" x2="490" y2="490"/>
+    <line x1="470" y1="478" x2="466" y2="488"/><line x1="482" y1="478" x2="478" y2="488"/><line x1="494" y1="478" x2="490" y2="488"/>
   </g>
-  <line x1="335" y1="420" x2="335" y2="510" stroke="#d3d1c7" stroke-width="1.5"/>
-  <line x1="625" y1="420" x2="625" y2="510" stroke="#d3d1c7" stroke-width="1.5"/>
+  <line x1="335" y1="415" x2="335" y2="495" stroke="#d3d1c7" stroke-width="1.5"/>
+  <line x1="625" y1="415" x2="625" y2="495" stroke="#d3d1c7" stroke-width="1.5"/>
   <!-- Uzuomina -->
-  <text x="480" y="530" font-size="14" fill="#888880" text-anchor="middle">Mygtukas — pilna prognozė</text>
+  <text x="480" y="525" font-size="14" fill="#888880" text-anchor="middle">Mygtukas — pilna prognozė</text>
 </svg>
