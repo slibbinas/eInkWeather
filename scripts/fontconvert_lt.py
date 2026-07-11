@@ -13,6 +13,8 @@ parser.add_argument("name", action="store", help="name of the font.")
 parser.add_argument("size", type=int, help="font size to use.")
 parser.add_argument("fontstack", action="store", nargs='+', help="list of font files, ordered by descending priority.")
 parser.add_argument("--compress", dest="compress", action="store_true", help="compress glyph bitmaps.")
+parser.add_argument("--intervals", dest="intervals", default=None,
+                    help="custom intervals, e.g. 0x20-0x20,0x2D-0x2E,0x30-0x39,0xB0-0xB0")
 args = parser.parse_args()
 
 GlyphProps = namedtuple("GlyphProps", ["width", "height", "advance_x", "left", "top", "compressed_size", "data_offset", "code_point"])
@@ -37,6 +39,12 @@ intervals = [
     (0x17D, 0x17E),  # Ž ž
     (0x201C, 0x201E),# " " „ kabutes
 ]
+
+if args.intervals:
+    intervals = []
+    for part in args.intervals.split(","):
+        a, b = part.split("-")
+        intervals.append((int(a, 0), int(b, 0)))
 
 
 def norm_floor(val):

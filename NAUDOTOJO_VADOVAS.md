@@ -30,7 +30,23 @@ atsidarys konfigūravimo portalas.
 - Viršuje rodoma: miestas, data, paskutinio atnaujinimo laikas, baterijos % ir įtampa,
   WiFi signalo stiprumas.
 
-## 3. Ekrano elementai
+## 3. Du režimai: pilnas ir paprastasis
+
+Įrenginys turi du ekranus, perjungiamus **plokštės mygtuku** (šoninis mygtukas, ne RESET):
+
+- **Pilnas** — visa informacija su grafikais (aprašyta žemiau).
+- **Paprastasis** — didelė temperatūra, jutiminė temperatūra, šmaikštus patarimas,
+  kaip šiandien rengtis (su drabužių piktogramomis: maikutė, megztinis, striukė, kepurė,
+  skėtis), ir dienos eiga: rytas / diena / vakaras.
+
+Paspaudus mygtuką įrenginys pabunda, parsisiunčia šviežius orus ir perpiešia ekraną kitu
+režimu (užtrunka ~20–30 s — e-ink lėtas, bet taupus). Pasirinktas režimas įsimenamas ir
+išlieka per visus miego ciklus; atjungus maitinimą grįžtama į pilną režimą.
+
+Patarimai „kaip rengtis" specialiai sukalibruoti šalčio nemėgstantiems: rekomendacijos
+visada puse laiptelio šiltesnės, o frazės keičiasi kasdien.
+
+## 4. Ekrano elementai (pilnas režimas)
 
 | Zona | Kas rodoma |
 |---|---|
@@ -42,14 +58,14 @@ atsidarys konfigūravimo portalas.
 | Vidurys | 3 parų prognozė kas 3 val. (laikas, piktograma, temperatūra) |
 | Apačia | 4 grafikai: slėgis, temperatūra, lietus ir **sniegas arba drėgnumas** (sniego grafikas rodomas tik kai prognozuojamas sniegas; kitu atveju — drėgnumas) |
 
-## 4. Baterija
+## 5. Baterija
 
 - Li-ion / LiPo baterija kraunama per USB-C jungtį.
 - 100 % ≈ 4,2 V, 0 % ≈ 3,2 V. Rodoma viršuje dešinėje.
 - Su 30 min. intervalu ir nakties miegu baterijos paprastai užtenka keliems mėnesiams
   (priklauso nuo talpos ir WiFi signalo stiprumo).
 
-## 5. Trikčių šalinimas
+## 6. Trikčių šalinimas
 
 | Problema | Sprendimas |
 |---|---|
@@ -59,7 +75,7 @@ atsidarys konfigūravimo portalas.
 | Nerodo orų (tuščias ekranas po pabudimo) | OWM API raktas negalioja arba nėra interneto; patikrinkite raktą `owm_credentials.h` |
 | Klaustukas vietoj orų piktogramos | OWM grąžino nežinomą piktogramos kodą — praeis su kitu atsinaujinimu |
 
-## 6. Programuotojui
+## 7. Programuotojui
 
 ### Aplinka
 - VS Code + PlatformIO, plokštė `esp32-s3-devkitc-1` (16 MB flash, PSRAM).
@@ -88,18 +104,17 @@ Pergeneravimas (pvz., pakeitus šriftą ar dydį):
 Išvestį išsaugoti UTF-8 formatu į `include/opensans12b.h`. Norint autentiško Open Sans —
 atsisiųskite `OpenSans-Bold.ttf` ir nurodykite jį vietoj `segoeuib.ttf`.
 
-## 7. Versijų istorija
+## 8. Versijų istorija
 
-- **2026-07** — WiFiManager konfigūravimo portalas; lietuviškos raidės ekrane (ą, č, ę, ė, į, š, ų, ū, ž);
+- **2026-07** — paprastasis („žmonos") režimas su aprangos patarimais, perjungiamas mygtuku;
+  WiFiManager konfigūravimo portalas; lietuviškos raidės ekrane (ą, č, ę, ė, į, š, ų, ū, ž);
   lietuviškos vėjo kryptys; pataisyta klaida, dėl kurios vasarą būdavo rodomas sniego grafikas
   vietoj drėgnumo; naktį miegama iki ryto; baterijos % apsauga nuo klaidingų reikšmių.
 - **Bazinė versija** — D. Bird LilyGo-EPD-4-7-OWM-Weather-Display v2.5 su mmHg ir
   baterijos kalibracijos modifikacijomis.
 
-## 8. Planuojamos funkcijos
+## 9. Planuojamos funkcijos
 
 - Pranešimas į Telegram / WhatsApp, kai baterija nusenka iki ~10 %.
-- **Paprastasis („žmonos") režimas** — be grafikų: temperatūra, jutiminė temperatūra ir
-  šmaikštus patarimas, kaip rengtis (megztinis, striukė, skėtis...). Persijungimas mygtuku.
 - Grįžtamasis ryšys per messengerį („ar prognozė buvo teisinga?") su korekcijų kaupimu
   SD kortelėje.

@@ -33,6 +33,7 @@ void drawStringAuto(int x, int y, String text, alignment align);
 
 // --- PAGRINDINIO EKRANO PIEŠIMO BLOKAI ---
 void DisplayWeather();
+void DisplayWifeMode();
 void DisplayGeneralInfoSection();
 void DisplayConditionsSection(int x, int y, String IconName, bool IconSize);
 void DisplayWeatherIcon(int x, int y);

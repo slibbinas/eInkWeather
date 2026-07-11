@@ -9,6 +9,8 @@
 #include "freertos/FreeRTOS.h"  // In-built
 #include "freertos/task.h"      // In-built
 #include "epd_driver.h"         // https://github.com/Xinyuan-LilyGO/LilyGo-EPD47
+#include "utilities.h"          // Plokštės pinai (BUTTON_1 = GPIO21 S3 versijoje)
+#include "driver/rtc_io.h"      // RTC GPIO pull-up gilaus miego metu
 #include "esp_adc_cal.h"        // In-built
 
 #include "ArduinoJson.h"        // https://github.com/bblanchon/ArduinoJson
@@ -81,9 +83,13 @@ long Delta           = 30; // ESP32 rtc speed compensation, prevents display at 
 #include "opensans12b.h"
 #include "opensans18b.h"
 #include "opensans24b.h"
+#include "opensans48b.h"        // Tik skaitmenys, '-', '.', '°' - didelei temperatūrai paprastame režime
 
 GFXfont  currentFont;
 uint8_t *framebuffer;
+
+// Paprastasis ("žmonos") režimas: išlieka per gilų miegą RTC atmintyje, perjungiamas plokštės mygtuku
+RTC_DATA_ATTR bool WifeMode = false;
 
 
 void BeginSleep() {
@@ -104,6 +110,10 @@ void BeginSleep() {
     if (SleepTimer <= 0) SleepTimer = SleepDuration * 60;
   }
   esp_sleep_enable_timer_wakeup(SleepTimer * 1000000LL); // in Secs, 1000000LL converts to Secs as unit = 1uSec
+  // Mygtukas (GPIO21, aktyvus žemas) žadina bet kada ir perjungia paprastą/pilną režimą
+  rtc_gpio_pullup_en((gpio_num_t)BUTTON_1);
+  rtc_gpio_pulldown_dis((gpio_num_t)BUTTON_1);
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)BUTTON_1, 0);
   #ifdef SERIAL_DEBUG 
    DBG("Awake for : " + String((millis() - StartTime) / 1000.0, 3) + "-secs");
    DBG("Entering " + String(SleepTimer) + " (secs) of sleep time");
@@ -147,9 +157,9 @@ uint8_t StartWiFi() {
     wm.setDebugOutput(false);
   #endif
   wm.setConnectTimeout(20); // sek. bandymui jungtis prie išsaugoto tinklo
-  bool timerWake = (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_TIMER);
-  if (timerWake) {
-    // Periodinis pabudimas: portalo neatidaryti (taupom bateriją), nepavykus - miegoti toliau
+  bool coldBoot = (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_UNDEFINED);
+  if (!coldBoot) {
+    // Pabudimas iš miego (taimeris ar mygtukas): portalo neatidaryti (taupom bateriją)
     wm.setEnableConfigPortal(false);
   }
   else {
@@ -199,6 +209,7 @@ void loop() {
 
 void setup() {
   InitialiseSystem();
+  if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT0) WifeMode = !WifeMode; // mygtukas perjungia režimą
   if (StartWiFi() == WL_CONNECTED && SetupTime() == true) {
     bool WakeUp = false;                
     if (WakeupHour > SleepHour)
@@ -222,7 +233,8 @@ void setup() {
         StopWiFi();         // Reduces power consumption
         epd_poweron();      // Switch on EPD display
         epd_clear();        // Clear the screen
-        DisplayWeather();   // Display the weather data
+        if (WifeMode) DisplayWifeMode(); // Paprastas ekranas: temperatūra + patarimas kaip rengtis
+        else          DisplayWeather();  // Pilnas ekranas su grafikais
         edp_update();       // Update the display to show the information
         epd_poweroff_all(); // Switch off all power to EPD
       }
@@ -265,6 +277,7 @@ bool DecodeWeather(WiFiClient& json, String Type) {
     //WxConditions[0].Forecast2   = root["weather"][2]["description"].as<char*>(); DBG("For2: " + String(WxConditions[0].Forecast2));
     WxConditions[0].Icon        = root["weather"][0]["icon"].as<char*>();        DBG("Icon: " + String(WxConditions[0].Icon));
     WxConditions[0].Temperature = root["main"]["temp"].as<float>();              DBG("Temp: " + String(WxConditions[0].Temperature));
+    WxConditions[0].Feelslike   = root["main"]["feels_like"].as<float>();        DBG("FLik: " + String(WxConditions[0].Feelslike));
     WxConditions[0].Pressure    = root["main"]["pressure"].as<float>();          DBG("Pres: " + String(WxConditions[0].Pressure));
     WxConditions[0].Humidity    = root["main"]["humidity"].as<float>();          DBG("Humi: " + String(WxConditions[0].Humidity));
     WxConditions[0].Low         = root["main"]["temp_min"].as<float>();          DBG("TLow: " + String(WxConditions[0].Low));
@@ -304,6 +317,8 @@ bool DecodeWeather(WiFiClient& json, String Type) {
       //WxForecast[r].Cloudcover        = list[r]["clouds"]["all"].as<int>();               DBG("CCov: " + String(WxForecast[r].Cloudcover)); // in % of cloud cover
       //WxForecast[r].Windspeed         = list[r]["wind"]["speed"].as<float>();             DBG("WSpd: " + String(WxForecast[r].Windspeed));
       //WxForecast[r].Winddir           = list[r]["wind"]["deg"].as<float>();               DBG("WDir: " + String(WxForecast[r].Winddir));
+      WxForecast[r].Pop               = list[r]["pop"].as<float>();                       DBG("Pop:  " + String(WxForecast[r].Pop));
+      WxForecast[r].Feelslike         = list[r]["main"]["feels_like"].as<float>();
       WxForecast[r].Rainfall          = list[r]["rain"]["3h"].as<float>();                DBG("Rain: " + String(WxForecast[r].Rainfall));
       WxForecast[r].Snowfall          = list[r]["snow"]["3h"].as<float>();                DBG("Snow: " + String(WxForecast[r].Snowfall));
       WxForecast[r].Period            = list[r]["dt_txt"].as<char*>();                    DBG("Peri: " + String(WxForecast[r].Period));
@@ -417,6 +432,204 @@ double NormalizedMoonPhase(int d, int m, int y) {
   //Calculate approximate moon phase
   double Phase = (j + 4.867) / 29.53059;
   return (Phase - (int) Phase);
+}
+
+//################ PAPRASTASIS ("ŽMONOS") REŽIMAS ########################################
+// Perjungiamas plokštės mygtuku (GPIO21). Be grafikų: temperatūra, jutiminė temperatūra,
+// šmaikštus patarimas kaip rengtis ir dienos eiga (rytas/diena/vakaras).
+
+struct ClothingAdvice {
+  String text;
+  bool tshirt, sweater, jacket, hat, umbrella;
+};
+
+ClothingAdvice GetClothingAdvice() {
+  ClothingAdvice a = {"", false, false, false, false, false};
+  float feels = WxConditions[0].Feelslike - 2.0; // šalčmyrės korekcija: patarimai puse laiptelio šilčiau
+  bool rainy  = (WxConditions[0].Rainfall > 0.1) || (WxForecast[0].Pop >= 0.35) || (WxForecast[1].Pop >= 0.35);
+  bool snowy  = (WxConditions[0].Snowfall > 0.05) || (WxForecast[0].Snowfall > 0.1);
+  bool windy  = (WxConditions[0].Windspeed >= 8);
+  int day = (WxConditions[0].Sunrise / 86400) % 3; // frazė keičiasi kasdien, bet nesikeičia tą pačią dieną
+  if (feels >= 22) {
+    a.tshirt = true;
+    const char* v[3] = {"Vasara kaip reikiant - užteks maikutės",
+                        "Karšta! Maikutė ir šalta arbata - daugiau nieko nereikia",
+                        "Šilta net šalčiausiam - drąsiai su maikute"};
+    a.text = v[day];
+  }
+  else if (feels >= 15) {
+    a.tshirt = true; a.sweater = true;
+    const char* v[3] = {"Gražu, bet ne karšta - maikutė, o megztinis ant pečių",
+                        "Megztinio diena: nei šalta, nei karšta - kaip tik",
+                        "Maikutė drąsiems, megztinis protingiems"};
+    a.text = v[day];
+  }
+  else if (feels >= 8) {
+    a.sweater = true; a.jacket = true;
+    const char* v[3] = {"Vėsoka - megztinis, o ant viršaus lengva striukė",
+                        "Megztinis ir striukė šiandien privalomi",
+                        "Oras sako: megztinis. Protas prideda: ir striukė"};
+    a.text = v[day];
+  }
+  else if (feels >= 0) {
+    a.jacket = true; a.hat = true;
+    const char* v[3] = {"Šalta! Šilta striukė ir kepurė - jokių kompromisų",
+                        "Striukė, kepurė ir greitas žingsnis - šiluma pati neateis",
+                        "Ausys padėkos už kepurę, o kaklas - už šaliką"};
+    a.text = v[day];
+  }
+  else {
+    a.jacket = true; a.hat = true;
+    const char* v[3] = {"Speigas! Žieminė striukė, kepurė, pirštinės - visa šarvuotė",
+                        "Oras tik pingvinams - renkis kaip į ekspediciją",
+                        "Šalčio ataka! Storiausia striukė ir arbata termose"};
+    a.text = v[day];
+  }
+  if (snowy)      { a.text += ". Sninga - batai neperšlampami!"; a.hat = true; }
+  else if (rainy) { a.text += ". Skėtis bus geriausias draugas!"; a.umbrella = true; }
+  if (windy && !snowy && !rainy) a.text += ". Vėjas piktas - užsisek iki kaklo!";
+  return a;
+}
+
+// Drabužių piktogramos: (x - centras, y - viršus, s - bazinis plotis)
+void DrawTShirtIcon(int x, int y, int s) {
+  int bw = s, bh = s * 1.15, sw = s / 3, sh = s / 2;
+  drawRect(x - bw / 2, y, bw, bh, Black);
+  drawRect(x - bw / 2 - sw, y, sw, sh, Black); // trumpos rankovės
+  drawRect(x + bw / 2, y, sw, sh, Black);
+  drawLine(x - s / 5, y, x, y + s / 6, Black); // kaklo iškirptė
+  drawLine(x + s / 5, y, x, y + s / 6, Black);
+}
+
+void DrawSweaterIcon(int x, int y, int s) {
+  int bw = s, bh = s * 1.15, sw = s / 3, sh = s * 0.9;
+  drawRect(x - bw / 2, y, bw, bh, Black);
+  drawRect(x - bw / 2 - sw, y, sw, sh, Black); // ilgos rankovės
+  drawRect(x + bw / 2, y, sw, sh, Black);
+  drawLine(x - s / 5, y, x, y + s / 6, Black);
+  drawLine(x + s / 5, y, x, y + s / 6, Black);
+  for (int row = 0; row < 2; row++) {          // mezgimo bangos
+    int yy = y + s / 2 + row * s / 4;
+    for (int i = 0; i < 3; i++) {
+      int xx = x - 3 * s / 8 + i * s / 4;
+      drawLine(xx, yy, xx + s / 8, yy - s / 12, Black);
+      drawLine(xx + s / 8, yy - s / 12, xx + s / 4, yy, Black);
+    }
+  }
+  for (int i = 1; i < 5; i++)                  // rumbuotas apvadas
+    drawLine(x - bw / 2 + i * bw / 5, y + bh - s / 8, x - bw / 2 + i * bw / 5, y + bh, Black);
+}
+
+void DrawJacketIcon(int x, int y, int s) {
+  int bw = s, bh = s * 1.15, sw = s / 3, sh = s * 0.9;
+  drawRect(x - bw / 2, y, bw, bh, Black);
+  drawRect(x - bw / 2 - sw, y, sw, sh, Black); // ilgos rankovės
+  drawRect(x + bw / 2, y, sw, sh, Black);
+  drawLine(x, y, x, y + bh, Black);            // užtrauktukas
+  drawLine(x + 1, y, x + 1, y + bh, Black);
+  fillTriangle(x - s / 4, y, x - 2, y, x - s / 8, y + s / 5, Black); // apykaklės atvartai
+  fillTriangle(x + s / 4, y, x + 2, y, x + s / 8, y + s / 5, Black);
+}
+
+void DrawHatIcon(int x, int y, int s) {
+  int r = s / 2;
+  int cy = y + r + s / 8;
+  for (float ang = PI; ang <= 2 * PI; ang += 0.02) { // kupolas
+    drawPixel(x + r * cos(ang), cy + r * sin(ang), Black);
+    drawPixel(x + r * cos(ang), cy + r * sin(ang) + 1, Black);
+  }
+  fillRect(x - r - s / 10, cy - s / 14, 2 * r + s / 5, s / 7, Black); // atvartas
+  fillCircle(x, cy - r - s / 10, s / 10, Black);                     // bumbulas
+}
+
+void DrawUmbrellaIcon(int x, int y, int s) {
+  int r = s / 2 + s / 6;
+  int cy = y + r;
+  for (float ang = PI; ang <= 2 * PI; ang += 0.02) { // kupolas
+    drawPixel(x + r * cos(ang), cy + r * sin(ang), Black);
+    drawPixel(x + r * cos(ang), cy + r * sin(ang) + 1, Black);
+  }
+  drawLine(x - r, cy, x + r, cy, Black);             // apačia
+  drawLine(x, cy - r - 4, x, cy, Black);             // smaigalys ir kotas per kupolą
+  drawLine(x, cy, x, y + s * 1.15, Black);
+  drawLine(x + 1, cy, x + 1, y + s * 1.15, Black);
+  for (float ang = 0; ang <= PI; ang += 0.05)        // rankenos kabliukas
+    drawPixel(x - s / 8 + (s / 8) * cos(ang), y + s * 1.15 + (s / 8) * sin(ang), Black);
+}
+
+int FindDayPart(int startHour, int endHour) { // artimiausias prognozės įrašas su vietos valanda intervale
+  for (int r = 0; r < 8; r++) {
+    time_t t = WxForecast[r].Dt;
+    struct tm *lt = localtime(&t);
+    if (lt->tm_hour >= startHour && lt->tm_hour <= endHour) return r;
+  }
+  return -1;
+}
+
+void DrawDayPart(int x, int y, String label, int idx) {
+  if (idx < 0) return;
+  setFont(&OpenSans10B);
+  drawString(x, y, label, CENTER);
+  DisplayConditionsSection(x, y + 60, WxForecast[idx].Icon, SmallIcon);
+  setFont(&OpenSans18B);
+  drawString(x, y + 78, String(WxForecast[idx].Temperature, 0) + "°", CENTER);
+}
+
+void DisplayWifeMode() {
+  DisplayStatusSection(600, 20, wifi_signal);
+  DisplayGeneralInfoSection();
+  drawLine(5, 45, 955, 45, Grey);
+  // Didelė orų piktograma kairėje
+  DisplayConditionsSection(150, 160, WxConditions[0].Icon, LargeIcon);
+  // Temperatūra ir jutiminė
+  setFont(&OpenSans48B);
+  drawString(430, 70, String(WxConditions[0].Temperature, 0) + "°", CENTER);
+  setFont(&OpenSans18B);
+  drawString(430, 190, "Jutiminė " + String(WxConditions[0].Feelslike, 0) + "°", CENTER);
+  // Dešinysis stulpelis: min/maks, vėjas, lietaus tikimybė
+  setFont(&OpenSans12B);
+  drawString(700, 85,  "Maks " + String(WxConditions[0].High, 0) + "°   Min " + String(WxConditions[0].Low, 0) + "°", LEFT);
+  drawString(700, 125, "Vėjas " + String(WxConditions[0].Windspeed, 0) + " m/s " + WindDegToOrdinalDirection(WxConditions[0].Winddir), LEFT);
+  float pop = max(WxForecast[0].Pop, max(WxForecast[1].Pop, WxForecast[2].Pop));
+  drawString(700, 165, "Lietus " + String((int)round(pop * 100)) + "%", LEFT);
+  // Patarimo blokas
+  ClothingAdvice adv = GetClothingAdvice();
+  drawRect(30, 250, 900, 145, Black);
+  drawRect(31, 251, 898, 143, Black);
+  int ix = 95, iy = 275, is_ = 55;
+  if (adv.tshirt)   { DrawTShirtIcon(ix, iy, is_);   ix += 95; }
+  if (adv.sweater)  { DrawSweaterIcon(ix, iy, is_);  ix += 95; }
+  if (adv.jacket)   { DrawJacketIcon(ix, iy, is_);   ix += 95; }
+  if (adv.hat)      { DrawHatIcon(ix, iy, is_);      ix += 95; }
+  if (adv.umbrella) { DrawUmbrellaIcon(ix, iy, is_); ix += 95; }
+  int tx = ix + 10;
+  setFont(&OpenSans8B);
+  drawString(tx, 262, "KAIP RENGTIS", LEFT);
+  setFont(&OpenSans12B);
+  String text = adv.text;
+  const unsigned int maxLen = 44;
+  int line = 0;
+  while (text.length() > 0 && line < 3) { // paprastas teksto laužymas per tarpus
+    String chunk = text;
+    if (text.length() > maxLen) {
+      int split = text.lastIndexOf(' ', maxLen);
+      if (split <= 0) split = maxLen;
+      chunk = text.substring(0, split);
+      text = text.substring(split + 1);
+    }
+    else text = "";
+    drawString(tx, 290 + line * 32, chunk, LEFT);
+    line++;
+  }
+  // Dienos eiga: rytas / diena / vakaras
+  DrawDayPart(190, 415, "Rytas",   FindDayPart(6, 10));
+  DrawDayPart(480, 415, "Diena",   FindDayPart(11, 16));
+  DrawDayPart(770, 415, "Vakaras", FindDayPart(17, 22));
+  drawLine(335, 420, 335, 510, LightGrey);
+  drawLine(625, 420, 625, 510, LightGrey);
+  // Užuomina apačioje
+  setFont(&OpenSans8B);
+  drawString(480, 518, "Mygtukas - pilna prognozė", CENTER);
 }
 
 void DisplayWeather() {                          // 4.7" e-paper display is 960x540 resolution
