@@ -106,6 +106,14 @@ Preferences prefs;
 String TgToken;      // Telegram bot token (perrašo const telegramBotToken)
 int    FeedbackHr;   // vakarinio klausimo valanda (perrašo const FeedbackHour)
 
+// Trumpas veikimo žurnalas - grąžinamas per Telegram komandą /log (kaip serial nuotoliniu būdu)
+String RunLog;
+void LOGT(const String& s) {
+  DBG(s);
+  RunLog += s + "\n";
+  if (RunLog.length() > 1500) RunLog = RunLog.substring(RunLog.length() - 1500); // Telegram žinutės riba
+}
+
 
 void BeginSleep() {
   epd_poweroff_all();
@@ -185,10 +193,10 @@ uint8_t StartWiFi() {
   }
   if (wm.autoConnect(WIFI_AP_NAME)) {
     wifi_signal = WiFi.RSSI(); // Get Wifi Signal strength now, because the WiFi will be turned off to save power!
-    DBG("WiFi connected at: " + WiFi.localIP().toString());
+    LOGT("WiFi OK " + WiFi.localIP().toString() + " RSSI=" + String(wifi_signal));
   }
   else {
-    DBG("WiFi connection *** FAILED ***");
+    LOGT("WiFi FAIL");
   }
   return WiFi.status();
 }
@@ -269,6 +277,7 @@ void StartConfigPortal() { // blokuojanti; po išsaugojimo įrenginys pasileidž
   wm.addParameter(&p_fb);
   cfgSaved = false;
   wm.setSaveParamsCallback(OnSaveConfigParams);
+  wm.setShowInfoErase(true); // „Info" puslapyje - mygtukas WiFi nustatymams išvalyti
   std::vector<const char*> menu = {"wifi", "param", "info", "sep", "restart", "exit"};
   wm.setMenu(menu);
   wm.setConfigPortalTimeout(300);
@@ -337,9 +346,9 @@ void setup() {
         if (RxForecast == false) RxForecast = obtainWeatherData(client, "forecast");
         Attempts++;
       }
-      #ifdef SERIAL_DEBUG 
-       DBG("Received all weather data...");
-      #endif
+      LOGT("Laikas " + Date_str + " " + Time_str);
+      LOGT("Orai w=" + String(RxWeather) + " f=" + String(RxForecast) +
+           (RxWeather ? (" T=" + String(WxConditions[0].Temperature, 1) + " jaučiasi=" + String(WxConditions[0].Feelslike, 1)) : ""));
       if (RxWeather && RxForecast) { // Only if received both Weather or Forecast proceed
         TelegramSync();     // Atsakymai, koeficiento korekcija, perspėjimai - kol WiFi dar veikia
         StopWiFi();         // Reduces power consumption
@@ -598,6 +607,37 @@ void ApplyFeedback(const String& data, const String& chatId) {
   TgSendMessage(chatId, reply, false);
 }
 
+void HandleTgCommand(const String& text, const String& cid) { // atsako į /status, /log, /wifireset, /help
+  String cmd = text;
+  cmd.toLowerCase();
+  if (cmd.startsWith("/status")) {
+    String s = "📟 Orų stotelė v" + version + "\n";
+    s += "🕐 " + Date_str + " " + Time_str + "\n";
+    s += "📍 " + City + "\n";
+    s += "🌡 " + String(WxConditions[0].Temperature, 1) + "°C (jaučiasi " + String(WxConditions[0].Feelslike, 1) + "°)\n";
+    s += "💧 " + String(WxConditions[0].Humidity, 0) + "%   " + String(hPa_to_mmHg(WxConditions[0].Pressure), 0) + " mmHg\n";
+    s += "💨 " + String(WxConditions[0].Windspeed, 1) + " m/s " + WindDegToOrdinalDirection(WxConditions[0].Winddir) + "\n";
+    s += "🔋 " + String(BatteryPct) + "% (" + String(BatteryVoltage, 2) + " V)\n";
+    s += "📶 RSSI " + String(WiFi.RSSI()) + " dBm\n";
+    s += "🧥 ChillBias " + String(ChillBias, 1) + "°C   Režimas: " + (WifeMode ? "paprastas" : "pilnas") + "\n";
+    s += "🧠 Laisva RAM " + String(ESP.getFreeHeap() / 1024) + " KB";
+    TgSendMessage(cid, s, false);
+  }
+  else if (cmd.startsWith("/log")) {
+    TgSendMessage(cid, RunLog.length() ? ("🧾 Žurnalas:\n" + RunLog) : "Žurnalas tuščias.", false);
+  }
+  else if (cmd.startsWith("/wifireset")) {
+    TgSendMessage(cid, "🔄 WiFi nustatymai išvalyti. Įrenginys pasileidžia iš naujo ir atidaro „OruStotele-Setup\" portalą (192.168.4.1).", false);
+    WiFiManager wm;
+    wm.resetSettings();
+    delay(1500);
+    ESP.restart();
+  }
+  else { // /help, /start ar nežinoma komanda
+    TgSendMessage(cid, "Komandos:\n/status – dabartinė būsena\n/log – veikimo žurnalas (kaip serial)\n/wifireset – pamiršti WiFi tinklą\n/help – ši žinutė\n\nVakarais paklausiu, ar tiko apranga.", false);
+  }
+}
+
 void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
   if (TgToken.length() == 0) return;
   String chatId = prefs.getString("chatId", String(telegramChatID));
@@ -618,13 +658,15 @@ void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
           if (chatId.length() == 0) { chatId = cid; prefs.putString("chatId", chatId); }
           ApplyFeedback(data, cid);
         }
-        else if (upd.containsKey("message")) { // pirma žinutė botui - įsimenam chat ID
+        else if (upd.containsKey("message")) { // žinutė botui - komanda arba pirmas kontaktas
           String cid; serializeJson(upd["message"]["chat"]["id"], cid);
-          if (chatId.length() == 0) {
+          String text = upd["message"]["text"] | "";
+          if (chatId.length() == 0) { // pirmas parašęs -> savininkas
             chatId = cid;
             prefs.putString("chatId", chatId);
-            TgSendMessage(chatId, "Sveiki! Čia jūsų orų stotelė 🌤 Vakarais paklausiu, ar tiko apranga - taip mokysiuos patarinėti geriau.", false);
+            TgSendMessage(chatId, "Sveiki! Čia jūsų orų stotelė 🌤 Vakarais paklausiu, ar tiko apranga. Komandos: /status /log /wifireset /help", false);
           }
+          if (cid == chatId && text.startsWith("/")) HandleTgCommand(text, cid); // komandas priima tik iš savininko
         }
       }
       prefs.putLong("tgOffset", offset);

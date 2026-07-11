@@ -81,6 +81,11 @@ Visus nustatymus galima pakeisti telefonu, nieko neredaguojant kode:
 Portalas veikia 5 minutes; jei nieko neišsaugosite, įrenginys grįžta į įprastą darbą.
 Nustatymai saugomi įrenginio atmintyje ir išlieka atjungus maitinimą.
 
+**WiFi tinklo keitimas / pamiršimas** (pvz., persikrausčius):
+- Portale pasirinkite **„Configure WiFi"** ir įveskite naują tinklą, arba
+- **„Info"** puslapyje spauskite **„Erase"** — visiškai pamiršti WiFi (po to atsidarys naujo tinklo langas), arba
+- per Telegram parašykite **`/wifireset`**.
+
 ## 6. Telegram: „ar tiko apranga?" ir baterijos perspėjimai
 
 Stotelė gali bendrauti per Telegram botą (įjungimas — šio skyriaus pabaigoje):
@@ -95,6 +100,19 @@ Stotelė gali bendrauti per Telegram botą (įjungimas — šio skyriaus pabaigo
 Atsakyti galima bet kada — stotelė atsakymą pasiims kito pabudimo metu (per ~30 min.)
 ir patvirtins žinute. Koeficientas saugomas pastovioje atmintyje ir išlieka net atjungus
 maitinimą.
+
+### Komandos botui
+
+Parašykite botui komandą — atsakymą gausite per artimiausią pabudimą (iki ~30 min.):
+
+| Komanda | Ką daro |
+|---|---|
+| `/status` | Dabartinė būsena: laikas, temperatūra, jutiminė, drėgnumas, slėgis, vėjas, baterija, WiFi signalas, ChillBias, režimas, laisva atmintis |
+| `/log` | Veikimo žurnalas (kaip „serial" nuotoliniu būdu — WiFi, laikas, orų parsisiuntimas) |
+| `/wifireset` | Pamiršta WiFi tinklą ir pasileidžia iš naujo su konfigūravimo portalu |
+| `/help` | Komandų sąrašas |
+
+Komandas priima tik iš savininko (pirmo botui parašiusio žmogaus) telefono.
 
 ### Įjungimas
 
