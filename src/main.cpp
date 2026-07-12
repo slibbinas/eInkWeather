@@ -90,16 +90,20 @@ long Delta           = 30; // ESP32 rtc speed compensation, prevents display at 
 GFXfont  currentFont;
 uint8_t *framebuffer;
 
-// Paprastasis ("žmonos") režimas: išlieka per gilų miegą RTC atmintyje, perjungiamas plokštės mygtuku
-RTC_DATA_ATTR bool WifeMode = false;
+// Paprastasis ("žmonos") režimas - saugomas NVS, kad išliktų ir po ESP.restart()/maitinimo atjungimo
+bool WifeMode = false;
 
-// Telegram grįžtamasis ryšys
-RTC_DATA_ATTR int LastAskDay       = -1; // kad vakarinis klausimas būtų siunčiamas tik kartą per dieną
-RTC_DATA_ATTR int LastBattAlertDay = -1; // kad baterijos perspėjimas nesikartotų kas 30 min.
+// Telegram grįžtamasis ryšys (datos saugomos NVS, kad klausimas/perspėjimas nepasikartotų po restarto)
+int LastAskDay       = -1; // kada paskutinį kartą klausta apie aprangą
+int LastBattAlertDay = -1; // kada paskutinį kartą perspėta apie bateriją
 float ChillBias = -2.0;                  // šalčmyrės korekcija °C; koreguojama pagal atsakymus, saugoma NVS
 int   BatteryPct = -1;                   // -1 = nenuskaityta
 float BatteryVoltage = 0;
 Preferences prefs;
+
+// Atsiliepimų statistika (NVS) - kaupiama, kad matytųsi įtaka ir būtų daroma išvada
+int FbCold = 0, FbHot = 0, FbOk = 0, FbSkip = 0; // atsakymų kiekiai
+int FbLastDay = -1;                              // paskutinio atsiliepimo diena (time/86400)
 
 // Konfigūracija, keičiama per web portalą (ilgas mygtuko paspaudimas). Numatytos reikšmės
 // iš owm_credentials.h, tikrosios užkraunamos iš NVS per LoadConfig().
@@ -268,6 +272,9 @@ void StartConfigPortal() { // blokuojanti; po išsaugojimo įrenginys pasileidž
   WiFiManagerParameter p_sleep("sleepHour", "Nakties pradžia, val. (0-23)", String(SleepHour).c_str(), 4);
   WiFiManagerParameter p_tg("tgToken", "Telegram bot token (nebūtina)", TgToken.c_str(), 64);
   WiFiManagerParameter p_fb("fbHour", "Klausimo apie aprangą valanda (0-23)", String(FeedbackHr).c_str(), 4);
+  // Chat ID paprastai užsiregistruoja automatiškai (/adminas, /zmona), bet galima įvesti/išvalyti ir čia
+  WiFiManagerParameter p_adm("chatAdmin", "Admin chat ID (nebūtina)", prefs.getString("chatAdmin", "").c_str(), 24);
+  WiFiManagerParameter p_wife("chatWife", "Žmonos chat ID (nebūtina)", prefs.getString("chatWife", "").c_str(), 24);
   wm.addParameter(&p_api);
   wm.addParameter(&p_city);
   wm.addParameter(&p_country);
@@ -275,6 +282,8 @@ void StartConfigPortal() { // blokuojanti; po išsaugojimo įrenginys pasileidž
   wm.addParameter(&p_sleep);
   wm.addParameter(&p_tg);
   wm.addParameter(&p_fb);
+  wm.addParameter(&p_adm);
+  wm.addParameter(&p_wife);
   cfgSaved = false;
   wm.setSaveParamsCallback(OnSaveConfigParams);
   wm.setShowInfoErase(true); // „Info" puslapyje - mygtukas WiFi nustatymams išvalyti
@@ -290,6 +299,8 @@ void StartConfigPortal() { // blokuojanti; po išsaugojimo įrenginys pasileidž
     prefs.putInt("sleepHour",  constrain(atoi(p_sleep.getValue()), 0, 23));
     prefs.putString("tgToken", p_tg.getValue());
     prefs.putInt("fbHour",     constrain(atoi(p_fb.getValue()), 0, 23));
+    if (strlen(p_adm.getValue()))  prefs.putString("chatAdmin", p_adm.getValue());  // rankinis įvedimas nebūtinas
+    if (strlen(p_wife.getValue())) prefs.putString("chatWife",  p_wife.getValue());
   }
   ESP.restart(); // nauji nustatymai įsigalioja po perkrovimo
 }
@@ -319,14 +330,21 @@ void setup() {
   InitialiseSystem();
   prefs.begin("eink", false);
   LoadConfig();
+  // Būsena iš NVS (išlieka po restarto/maitinimo)
+  WifeMode         = prefs.getBool("wifeMode", false);
+  LastAskDay       = prefs.getInt("lastAsk", -1);
+  LastBattAlertDay = prefs.getInt("lastBatt", -1);
+  ChillBias        = prefs.getFloat("chillBias", -2.0);
+  FbCold = prefs.getInt("fbCold", 0);  FbHot  = prefs.getInt("fbHot", 0);
+  FbOk   = prefs.getInt("fbOk", 0);    FbSkip = prefs.getInt("fbSkip", 0);
+  FbLastDay = prefs.getInt("fbLast", -1);
   esp_sleep_wakeup_cause_t wakeCause = esp_sleep_get_wakeup_cause();
   if (wakeCause == ESP_SLEEP_WAKEUP_EXT0) {
-    if (ButtonHeldLong()) StartConfigPortal(); // ilgas paspaudimas -> nustatymai (ir restart)
-    else                  WifeMode = !WifeMode; // trumpas -> perjungti režimą
+    if (ButtonHeldLong()) StartConfigPortal();   // ilgas paspaudimas -> nustatymai (ir restart)
+    else { WifeMode = !WifeMode; prefs.putBool("wifeMode", WifeMode); } // trumpas -> perjungti ir įsiminti
   }
   // Mygtukas ar įjungimas -> atnaujinti bet kada; tik planinis (taimerio) žadinimas paiso nakties lango
   bool forceRefresh = (wakeCause != ESP_SLEEP_WAKEUP_TIMER);
-  ChillBias = prefs.getFloat("chillBias", -2.0);
   ReadBattery();
   if (StartWiFi() == WL_CONNECTED && SetupTime() == true) {
     bool WakeUp = forceRefresh;
@@ -578,36 +596,82 @@ String TgApiCall(const String& method, const String& jsonBody) {
   return resp;
 }
 
+// Išvada iš atsiliepimų - rodoma žmonos ekrane ir per /status
+String FeedbackConclusion() {
+  int total = FbCold + FbHot + FbOk + FbSkip;
+  if (total < 2)                                       return "renkuosi patarimus, reikia daugiau atsiliepimų";
+  if (FbSkip * 100 / total >= 40)                      return "dažnai nesilaikote patarimų 🙂";
+  if (ChillBias <= -3.0 || FbCold > FbHot + FbOk)      return "dažniau jaučiate šaltį — renku šilčiau 🧣";
+  if (ChillBias >=  0.5 || FbHot  > FbCold + FbOk)     return "mėgstate lengviau — renku vėsiau 😎";
+  return "patarimai gerai pritaikyti 🎯";
+}
+
+String FbLabel(const String& data) {
+  if (data == "FB_COLD") return "buvo šalta 🥶";
+  if (data == "FB_HOT")  return "buvo karšta 🥵";
+  if (data == "FB_OK")   return "kaip tik 👍";
+  if (data == "FB_SKIP") return "nesilaikė patarimo 🤷";
+  return "";
+}
+
 void TgSendMessage(const String& chatId, const String& text, bool withButtons) {
   DynamicJsonDocument doc(2048);
   doc["chat_id"] = chatId;
   doc["text"] = text;
   if (withButtons) {
-    JsonArray row = doc["reply_markup"]["inline_keyboard"].createNestedArray();
-    JsonObject b1 = row.createNestedObject(); b1["text"] = "🥶 Buvo šalta"; b1["callback_data"] = "FB_COLD";
-    JsonObject b2 = row.createNestedObject(); b2["text"] = "👍 Kaip tik";   b2["callback_data"] = "FB_OK";
-    JsonObject b3 = row.createNestedObject(); b3["text"] = "🥵 Buvo karšta"; b3["callback_data"] = "FB_HOT";
+    JsonArray kb = doc["reply_markup"].createNestedArray("inline_keyboard");
+    JsonArray row1 = kb.createNestedArray();
+    JsonObject b1 = row1.createNestedObject(); b1["text"] = "🥶 Buvo šalta"; b1["callback_data"] = "FB_COLD";
+    JsonObject b2 = row1.createNestedObject(); b2["text"] = "👍 Kaip tik";   b2["callback_data"] = "FB_OK";
+    JsonObject b3 = row1.createNestedObject(); b3["text"] = "🥵 Buvo karšta"; b3["callback_data"] = "FB_HOT";
+    JsonArray row2 = kb.createNestedArray();
+    JsonObject b4 = row2.createNestedObject(); b4["text"] = "🤷 Nesilaikiau patarimo"; b4["callback_data"] = "FB_SKIP";
   }
   String body;
   serializeJson(doc, body);
   TgApiCall("sendMessage", body);
 }
 
-void ApplyFeedback(const String& data, const String& chatId) {
-  float delta = 0;
-  String reply;
-  if      (data == "FB_COLD") { delta = -0.5; reply = "Užrašiau! 🧣 Nuo šiol patarimai bus šiltesni."; }
-  else if (data == "FB_HOT")  { delta = +0.5; reply = "Supratau! 😎 Kitąkart siūlysiu rengtis lengviau."; }
-  else if (data == "FB_OK")   {               reply = "Puiku, vadinasi pataikėm! 🎯"; }
-  else return;
-  if (delta != 0) {
-    ChillBias = constrain(ChillBias + delta, -5.0f, 1.0f);
-    prefs.putFloat("chillBias", ChillBias);
-  }
-  TgSendMessage(chatId, reply, false);
+void TgAnswerCallback(const String& cbId, const String& text) { // toast telefone, kad matytųsi jog užskaityta
+  DynamicJsonDocument doc(512);
+  doc["callback_query_id"] = cbId;
+  doc["text"] = text;
+  doc["show_alert"] = false;
+  String body; serializeJson(doc, body);
+  TgApiCall("answerCallbackQuery", body);
 }
 
-void HandleTgCommand(const String& text, const String& cid) { // atsako į /status, /log, /wifireset, /help
+void TgEditMessage(const String& chatId, long msgId, const String& text) { // pakeičia žinutę (dingsta mygtukai)
+  DynamicJsonDocument doc(1024);
+  doc["chat_id"] = chatId;
+  doc["message_id"] = msgId;
+  doc["text"] = text;
+  String body; serializeJson(doc, body);
+  TgApiCall("editMessageText", body);
+}
+
+void ProcessFeedback(const String& data, const String& cid, const String& cbId, long msgId) {
+  String reply;
+  if      (data == "FB_COLD") { ChillBias = constrain(ChillBias - 0.5f, -5.0f, 1.0f); FbCold++; reply = "Užrašiau! 🧣 Nuo šiol renku šilčiau."; }
+  else if (data == "FB_HOT")  { ChillBias = constrain(ChillBias + 0.5f, -5.0f, 1.0f); FbHot++;  reply = "Supratau! 😎 Kitąkart siūlysiu lengviau."; }
+  else if (data == "FB_OK")   { FbOk++;   reply = "Puiku, vadinasi pataikėm! 🎯"; }
+  else if (data == "FB_SKIP") { FbSkip++; reply = "Aišku, užskaičiau, kad nesilaikėte 🙂"; }
+  else return;
+  FbLastDay = (int)(time(NULL) / 86400);
+  prefs.putFloat("chillBias", ChillBias);
+  prefs.putInt("fbCold", FbCold); prefs.putInt("fbHot", FbHot);
+  prefs.putInt("fbOk", FbOk);     prefs.putInt("fbSkip", FbSkip);
+  prefs.putInt("fbLast", FbLastDay);
+  TgAnswerCallback(cbId, "Užskaityta ✅");                        // iššokantis patvirtinimas
+  if (msgId) TgEditMessage(cid, msgId, "Atsakyta: " + FbLabel(data) + ". Ačiū! 🙏"); // mygtukai dingsta
+  TgSendMessage(cid, reply, false);
+  // Kopija adminui, jei žmona atsakė
+  String admin = prefs.getString("chatAdmin", prefs.getString("chatId", String(telegramChatID)));
+  if (admin.length() && admin != cid)
+    TgSendMessage(admin, "👗 Žmona atsakė: " + FbLabel(data) + "\nIšvada: " + FeedbackConclusion(), false);
+}
+
+void HandleTgCommand(const String& text, const String& cid) { // /status, /log, /wifireset, /help (tik adminui)
   String cmd = text;
   cmd.toLowerCase();
   if (cmd.startsWith("/status")) {
@@ -617,10 +681,10 @@ void HandleTgCommand(const String& text, const String& cid) { // atsako į /stat
     s += "🌡 " + String(WxConditions[0].Temperature, 1) + "°C (jaučiasi " + String(WxConditions[0].Feelslike, 1) + "°)\n";
     s += "💧 " + String(WxConditions[0].Humidity, 0) + "%   " + String(hPa_to_mmHg(WxConditions[0].Pressure), 0) + " mmHg\n";
     s += "💨 " + String(WxConditions[0].Windspeed, 1) + " m/s " + WindDegToOrdinalDirection(WxConditions[0].Winddir) + "\n";
-    s += "🔋 " + String(BatteryPct) + "% (" + String(BatteryVoltage, 2) + " V)\n";
-    s += "📶 RSSI " + String(WiFi.RSSI()) + " dBm\n";
-    s += "🧥 ChillBias " + String(ChillBias, 1) + "°C   Režimas: " + (WifeMode ? "paprastas" : "pilnas") + "\n";
-    s += "🧠 Laisva RAM " + String(ESP.getFreeHeap() / 1024) + " KB";
+    s += "🔋 " + String(BatteryPct) + "% (" + String(BatteryVoltage, 2) + " V)   📶 " + String(WiFi.RSSI()) + " dBm\n";
+    s += "🧥 Korekcija " + String(ChillBias, 1) + "°C — " + FeedbackConclusion() + "\n";
+    s += "🗳 Atsiliepimai: šalta " + String(FbCold) + " / gerai " + String(FbOk) + " / karšta " + String(FbHot) + " / nesilaikyta " + String(FbSkip) + "\n";
+    s += "🖥 Režimas: " + String(WifeMode ? "paprastas" : "pilnas") + "   🧠 " + String(ESP.getFreeHeap() / 1024) + " KB";
     TgSendMessage(cid, s, false);
   }
   else if (cmd.startsWith("/log")) {
@@ -634,13 +698,14 @@ void HandleTgCommand(const String& text, const String& cid) { // atsako į /stat
     ESP.restart();
   }
   else { // /help, /start ar nežinoma komanda
-    TgSendMessage(cid, "Komandos:\n/status – dabartinė būsena\n/log – veikimo žurnalas (kaip serial)\n/wifireset – pamiršti WiFi tinklą\n/help – ši žinutė\n\nVakarais paklausiu, ar tiko apranga.", false);
+    TgSendMessage(cid, "Komandos:\n/status – dabartinė būsena ir atsiliepimų suvestinė\n/log – veikimo žurnalas (kaip serial)\n/wifireset – pamiršti WiFi tinklą\n/zmona – užregistruoti žmonos telefoną (klausimams apie aprangą)\n/adminas – užregistruoti admino telefoną (būsena, baterija)\n/help – ši žinutė", false);
   }
 }
 
 void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
   if (TgToken.length() == 0) return;
-  String chatId = prefs.getString("chatId", String(telegramChatID));
+  String admin = prefs.getString("chatAdmin", prefs.getString("chatId", String(telegramChatID)));
+  String wife  = prefs.getString("chatWife", "");
   long offset = prefs.getLong("tgOffset", 0);
   // 1. Pasiimti naujus atsakymus/žinutes
   String resp = TgApiCall("getUpdates?offset=" + String(offset) + "&limit=20&timeout=0", "");
@@ -654,35 +719,42 @@ void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
           String data = upd["callback_query"]["data"].as<const char*>();
           String cid;  serializeJson(upd["callback_query"]["message"]["chat"]["id"], cid);
           String cbId = upd["callback_query"]["id"].as<const char*>();
-          TgApiCall("answerCallbackQuery?callback_query_id=" + cbId, "");
-          if (chatId.length() == 0) { chatId = cid; prefs.putString("chatId", chatId); }
-          ApplyFeedback(data, cid);
+          long msgId  = upd["callback_query"]["message"]["message_id"].as<long>();
+          ProcessFeedback(data, cid, cbId, msgId);
         }
-        else if (upd.containsKey("message")) { // žinutė botui - komanda arba pirmas kontaktas
+        else if (upd.containsKey("message")) { // žinutė botui - registracija arba komanda
           String cid; serializeJson(upd["message"]["chat"]["id"], cid);
           String text = upd["message"]["text"] | "";
-          if (chatId.length() == 0) { // pirmas parašęs -> savininkas
-            chatId = cid;
-            prefs.putString("chatId", chatId);
-            TgSendMessage(chatId, "Sveiki! Čia jūsų orų stotelė 🌤 Vakarais paklausiu, ar tiko apranga. Komandos: /status /log /wifireset /help", false);
+          String lc = text; lc.toLowerCase();
+          if (lc.startsWith("/zmona")) {
+            wife = cid; prefs.putString("chatWife", wife);
+            TgSendMessage(cid, "Užregistruota kaip žmona 👗 Vakarais klausiu, ar tiko apranga.", false);
           }
-          if (cid == chatId && text.startsWith("/")) HandleTgCommand(text, cid); // komandas priima tik iš savininko
+          else if (lc.startsWith("/adminas")) {
+            admin = cid; prefs.putString("chatAdmin", admin);
+            TgSendMessage(cid, "Užregistruota kaip administratorius 🛠 Gausite būseną ir baterijos perspėjimus.", false);
+          }
+          else if (admin.length() == 0) { // pirmas parašęs -> adminas
+            admin = cid; prefs.putString("chatAdmin", admin);
+            TgSendMessage(cid, "Sveiki! Čia jūsų orų stotelė 🌤 Jūs — administratorius.\nŽmona tegul parašo /zmona.\nKomandos: /status /log /wifireset /help", false);
+          }
+          else if (cid == admin && text.startsWith("/")) HandleTgCommand(text, cid); // komandas priima tik adminas
         }
       }
       prefs.putLong("tgOffset", offset);
     }
   }
-  if (chatId.length() == 0) return; // dar niekas nerašė botui
   int today = (int)(time(NULL) / 86400);
-  // 2. Baterijos perspėjimas (kartą per dieną)
-  if (BatteryPct >= 0 && BatteryPct <= 10 && LastBattAlertDay != today) {
-    TgSendMessage(chatId, "🪫 Baterija liko " + String(BatteryPct) + "% (" + String(BatteryVoltage, 2) + " V) - laikas pakrauti!", false);
-    LastBattAlertDay = today;
+  // 2. Baterijos perspėjimas -> adminui (kartą per dieną)
+  if (admin.length() && BatteryPct >= 0 && BatteryPct <= 10 && LastBattAlertDay != today) {
+    TgSendMessage(admin, "🪫 Baterija liko " + String(BatteryPct) + "% (" + String(BatteryVoltage, 2) + " V) - laikas pakrauti!", false);
+    LastBattAlertDay = today; prefs.putInt("lastBatt", today);
   }
-  // 3. Vakarinis klausimas apie aprangą (kartą per dieną)
-  if (CurrentHour == FeedbackHr && LastAskDay != today) {
-    TgSendMessage(chatId, "Kaip šiandien tiko apranga pagal mano patarimą? 🙂", true);
-    LastAskDay = today;
+  // 3. Vakarinis klausimas apie aprangą -> žmonai (jei nustatyta), kitaip adminui (kartą per dieną)
+  String askTo = wife.length() ? wife : admin;
+  if (askTo.length() && CurrentHour == FeedbackHr && LastAskDay != today) {
+    TgSendMessage(askTo, "Kaip šiandien tiko apranga pagal mano patarimą? 🙂", true);
+    LastAskDay = today; prefs.putInt("lastAsk", today);
   }
 }
 
@@ -743,24 +815,43 @@ ClothingAdvice GetClothingAdvice() {
   return a;
 }
 
-// Drabužių piktogramos: (x - centras, y - viršus, s - bazinis plotis)
+// Apvalaus stačiakampio pagalbinės (e-ink neturi native rounded-rect)
+void drawArcCorner(int cx, int cy, int r, float a0, float a1) {
+  for (float a = a0; a <= a1; a += 0.05) {
+    int px = cx + r * cos(a), py = cy + r * sin(a);
+    drawPixel(px, py, Black);
+    drawPixel(px + 1, py, Black); // 2 px storis hi-res ekranui
+  }
+}
+void drawRoundRect(int x, int y, int w, int h, int r) {
+  drawLine(x + r, y,     x + w - r, y,     Black); // viršus
+  drawLine(x + r, y + h, x + w - r, y + h, Black); // apačia
+  drawLine(x,     y + r, x,         y + h - r, Black); // kairė
+  drawLine(x + w, y + r, x + w,     y + h - r, Black); // dešinė
+  drawArcCorner(x + r,     y + r,     r, PI,       1.5 * PI); // v. kairė
+  drawArcCorner(x + w - r, y + r,     r, 1.5 * PI, 2 * PI);   // v. dešinė
+  drawArcCorner(x + w - r, y + h - r, r, 0,        0.5 * PI); // a. dešinė
+  drawArcCorner(x + r,     y + h - r, r, 0.5 * PI, PI);       // a. kairė
+}
+
+// Drabužių piktogramos: (x - centras, y - viršus, s - bazinis plotis). Apvalūs kampai.
 void DrawTShirtIcon(int x, int y, int s) {
-  int bw = s, bh = s * 1.15, sw = s / 3, sh = s / 2;
-  drawRect(x - bw / 2, y, bw, bh, Black);
-  drawRect(x - bw / 2 - sw, y, sw, sh, Black); // trumpos rankovės
-  drawRect(x + bw / 2, y, sw, sh, Black);
-  drawLine(x - s / 5, y, x, y + s / 6, Black); // kaklo iškirptė
+  int bw = s, bh = s * 1.15, sw = s / 3, sh = s / 2, r = s / 7;
+  drawRoundRect(x - bw / 2, y, bw, bh, r);
+  drawRoundRect(x - bw / 2 - sw, y, sw, sh, r / 2); // trumpos rankovės
+  drawRoundRect(x + bw / 2, y, sw, sh, r / 2);
+  drawLine(x - s / 5, y, x, y + s / 6, Black);      // kaklo iškirptė
   drawLine(x + s / 5, y, x, y + s / 6, Black);
 }
 
 void DrawSweaterIcon(int x, int y, int s) {
-  int bw = s, bh = s * 1.15, sw = s / 3, sh = s * 0.9;
-  drawRect(x - bw / 2, y, bw, bh, Black);
-  drawRect(x - bw / 2 - sw, y, sw, sh, Black); // ilgos rankovės
-  drawRect(x + bw / 2, y, sw, sh, Black);
+  int bw = s, bh = s * 1.15, sw = s / 3, sh = s * 0.9, r = s / 7;
+  drawRoundRect(x - bw / 2, y, bw, bh, r);
+  drawRoundRect(x - bw / 2 - sw, y, sw, sh, r / 2); // ilgos rankovės
+  drawRoundRect(x + bw / 2, y, sw, sh, r / 2);
   drawLine(x - s / 5, y, x, y + s / 6, Black);
   drawLine(x + s / 5, y, x, y + s / 6, Black);
-  for (int row = 0; row < 2; row++) {          // mezgimo bangos
+  for (int row = 0; row < 2; row++) {               // mezgimo bangos
     int yy = y + s / 2 + row * s / 4;
     for (int i = 0; i < 3; i++) {
       int xx = x - 3 * s / 8 + i * s / 4;
@@ -768,19 +859,19 @@ void DrawSweaterIcon(int x, int y, int s) {
       drawLine(xx + s / 8, yy - s / 12, xx + s / 4, yy, Black);
     }
   }
-  for (int i = 1; i < 5; i++)                  // rumbuotas apvadas
+  for (int i = 1; i < 5; i++)                        // rumbuotas apvadas
     drawLine(x - bw / 2 + i * bw / 5, y + bh - s / 8, x - bw / 2 + i * bw / 5, y + bh, Black);
 }
 
 void DrawJacketIcon(int x, int y, int s) {
-  int bw = s, bh = s * 1.15, sw = s / 3, sh = s * 0.9;
-  drawRect(x - bw / 2, y, bw, bh, Black);
-  drawRect(x - bw / 2 - sw, y, sw, sh, Black); // ilgos rankovės
-  drawRect(x + bw / 2, y, sw, sh, Black);
-  drawLine(x, y, x, y + bh, Black);            // užtrauktukas
-  drawLine(x + 1, y, x + 1, y + bh, Black);
-  fillTriangle(x - s / 4, y, x - 2, y, x - s / 8, y + s / 5, Black); // apykaklės atvartai
-  fillTriangle(x + s / 4, y, x + 2, y, x + s / 8, y + s / 5, Black);
+  int bw = s, bh = s * 1.15, sw = s / 3, sh = s * 0.9, r = s / 7;
+  drawRoundRect(x - bw / 2, y, bw, bh, r);
+  drawRoundRect(x - bw / 2 - sw, y, sw, sh, r / 2); // ilgos rankovės
+  drawRoundRect(x + bw / 2, y, sw, sh, r / 2);
+  drawLine(x, y + s / 6, x, y + bh, Black);         // užtrauktukas
+  drawLine(x + 1, y + s / 6, x + 1, y + bh, Black);
+  fillTriangle(x - s / 4, y, x - 2, y + s / 6, x - s / 8, y + s / 4, Black); // apykaklės atvartai
+  fillTriangle(x + s / 4, y, x + 2, y + s / 6, x + s / 8, y + s / 4, Black);
 }
 
 void DrawHatIcon(int x, int y, int s) {
@@ -820,50 +911,69 @@ int FindDayPart(int startHour, int endHour) { // artimiausias prognozės įraša
 
 void DrawDayPart(int x, int y, String label, int idx) {
   if (idx < 0) return;
-  setFont(&OpenSans10B);
-  drawString(x, y, label, CENTER);
-  DisplayConditionsSection(x, y + 60, WxForecast[idx].Icon, SmallIcon);
   setFont(&OpenSans18B);
-  drawString(x, y + 78, String(WxForecast[idx].Temperature, 0) + "°", CENTER);
+  drawString(x, y, label, CENTER);                                            // didesnė antraštė
+  DisplayConditionsSection(x - 48, y + 62, WxForecast[idx].Icon, SmallIcon);  // ikona kairėje
+  setFont(&OpenSans24B);
+  drawString(x + 40, y + 50, String(WxForecast[idx].Temperature, 0) + "°", CENTER); // temp iki ikonos vidurio
+}
+
+// Viršutinis mygtuko indikatorius: trikampis kampu į viršų ties fiziniu mygtuku
+void DrawTopButtonHint(bool wifeMode) {
+  fillTriangle(360, 4, 348, 20, 372, 20, Black);
+  setFont(&OpenSans12B);
+  drawString(384, 4, wifeMode ? "spausk viršutinį mygtuką - PILNA PROGNOZĖ"
+                              : "spausk viršutinį mygtuką - PAPRASTAS VAIZDAS", LEFT);
+}
+
+// Apatinis baras: miestas + data + WiFi + baterija (abu režimai), linija virš jo
+void DisplayBottomBar() {
+  drawLine(5, 498, 955, 498, Grey);
+  setFont(&OpenSans12B);
+  drawString(15, 505, City, LEFT);
+  drawString(150, 505, Date_str + "  @  " + Time_str, LEFT);
+  DrawBattery(680, 524);
+  DrawRSSI(862, 532, wifi_signal);
 }
 
 void DisplayWifeMode() {
-  DisplayStatusSection(600, 20, wifi_signal);
-  DisplayGeneralInfoSection();
-  drawLine(5, 45, 955, 45, Grey);
+  DrawTopButtonHint(true);
   // Didelė orų piktograma kairėje
-  DisplayConditionsSection(150, 160, WxConditions[0].Icon, LargeIcon);
-  // Didelis skaičius - JUTIMINĖ temperatūra (kaip iš tikrųjų jaučiasi); mažas - termometro rodmuo
+  DisplayConditionsSection(120, 108, WxConditions[0].Icon, LargeIcon);
+  // Didelis skaičius - JUTIMINĖ (kaip jaučiasi); mažas ir ne centre - termometro rodmuo
   setFont(&OpenSans18B);
-  drawString(430, 45, "jaučiasi kaip", CENTER);
+  drawString(415, 40, "jaučiasi kaip", CENTER);
   setFont(&OpenSans48B);
-  drawString(430, 90, String(WxConditions[0].Feelslike, 0) + "°", CENTER);
-  setFont(&OpenSans18B);
-  drawString(430, 200, "termometras rodo " + String(WxConditions[0].Temperature, 0) + "°", CENTER);
-  // Dešinysis stulpelis: min/maks, vėjas, lietaus tikimybė
+  drawString(415, 78, String(WxConditions[0].Feelslike, 0) + "°", CENTER);
   setFont(&OpenSans12B);
-  drawString(700, 85,  "Maks " + String(WxConditions[0].High, 0) + "°   Min " + String(WxConditions[0].Low, 0) + "°", LEFT);
-  drawString(700, 125, "Vėjas " + String(WxConditions[0].Windspeed, 0) + " m/s " + WindDegToOrdinalDirection(WxConditions[0].Winddir), LEFT);
+  drawString(270, 176, "termometras rodo " + String(WxConditions[0].Temperature, 0) + "°", LEFT);
+  // Dešinys stulpelis: maks/min/vėjas/lietus dideli su rodyklėmis
+  setFont(&OpenSans24B);
+  fillTriangle(624, 54, 616, 68, 632, 68, Black);   // ▲ maks
+  drawString(640, 50, String(WxConditions[0].High, 0) + "°", LEFT);
+  fillTriangle(748, 68, 740, 54, 756, 54, Black);   // ▼ min
+  drawString(764, 50, String(WxConditions[0].Low, 0) + "°", LEFT);
+  setFont(&OpenSans18B);
+  drawString(620, 104, String(WxConditions[0].Windspeed, 0) + " m/s " + WindDegToOrdinalDirection(WxConditions[0].Winddir), LEFT);
   float pop = max(WxForecast[0].Pop, max(WxForecast[1].Pop, WxForecast[2].Pop));
-  drawString(700, 165, "Lietus " + String((int)round(pop * 100)) + "%", LEFT);
-  // Patarimo blokas
+  drawString(620, 142, "lietus " + String((int)round(pop * 100)) + "%", LEFT);
+  // Aprangos patarimas - be rėmelio, tik linijos; ikonos fiksuotoje zonoje; tekstas fiksuotoje vietoje
   ClothingAdvice adv = GetClothingAdvice();
-  drawRect(30, 250, 900, 145, Black);
-  drawRect(31, 251, 898, 143, Black);
-  int ix = 95, iy = 275, is_ = 55;
-  if (adv.tshirt)   { DrawTShirtIcon(ix, iy, is_);   ix += 95; }
-  if (adv.sweater)  { DrawSweaterIcon(ix, iy, is_);  ix += 95; }
-  if (adv.jacket)   { DrawJacketIcon(ix, iy, is_);   ix += 95; }
-  if (adv.hat)      { DrawHatIcon(ix, iy, is_);      ix += 95; }
-  if (adv.umbrella) { DrawUmbrellaIcon(ix, iy, is_); ix += 95; }
-  int tx = ix + 10;
+  drawLine(20, 196, 940, 196, Black);
+  int iy = 212, is_ = 52, ix = 70;
+  if (adv.tshirt)   { DrawTShirtIcon(ix, iy, is_);   ix += 84; }
+  if (adv.sweater)  { DrawSweaterIcon(ix, iy, is_);  ix += 84; }
+  if (adv.jacket)   { DrawJacketIcon(ix, iy, is_);   ix += 84; }
+  if (adv.hat)      { DrawHatIcon(ix, iy, is_);      ix += 84; }
+  if (adv.umbrella) { DrawUmbrellaIcon(ix, iy, is_); ix += 84; } // skėtis tik kai reikia
+  const int tx = 360;                        // FIKSUOTA teksto kairė - nepriklauso nuo ikonų (nebeišlipa)
   setFont(&OpenSans8B);
-  drawString(tx, 262, "KAIP RENGTIS", LEFT);
+  drawString(tx, 200, "KAIP RENGTIS", LEFT);
   setFont(&OpenSans12B);
   String text = adv.text;
-  const unsigned int maxLen = 44;
+  const unsigned int maxLen = 40;            // telpa nuo tx=360 iki ~930
   int line = 0;
-  while (text.length() > 0 && line < 3) { // paprastas teksto laužymas per tarpus
+  while (text.length() > 0 && line < 2) {
     String chunk = text;
     if (text.length() > maxLen) {
       int split = text.lastIndexOf(' ', maxLen);
@@ -872,28 +982,41 @@ void DisplayWifeMode() {
       text = text.substring(split + 1);
     }
     else text = "";
-    drawString(tx, 290 + line * 32, chunk, LEFT);
+    drawString(tx, 226 + line * 30, chunk, LEFT);
     line++;
   }
-  // Dienos eiga: rytas / diena / vakaras
-  DrawDayPart(190, 415, "Rytas",   FindDayPart(6, 10));
-  DrawDayPart(480, 415, "Diena",   FindDayPart(11, 16));
-  DrawDayPart(770, 415, "Vakaras", FindDayPart(17, 22));
-  drawLine(335, 420, 335, 510, LightGrey);
-  drawLine(625, 420, 625, 510, LightGrey);
-  // Užuomina apačioje
-  setFont(&OpenSans8B);
-  drawString(480, 518, "Mygtukas - pilna prognozė", CENTER);
+  drawLine(20, 298, 940, 298, Black);
+  // Adaptacijos info: korekcija + paskutinis atsiliepimas + išvada (matosi, kad įtakoji)
+  String lastFb = "-";
+  if (FbLastDay > 0) {
+    time_t t = (time_t)FbLastDay * 86400L;
+    struct tm *lt = gmtime(&t);
+    char buf[8]; sprintf(buf, "%02d-%02d", lt->tm_mon + 1, lt->tm_mday);
+    lastFb = buf;
+  }
+  setFont(&OpenSans10B);
+  drawString(30, 306, "Korekcija " + String(ChillBias, 1) + "°     paskutinis atsiliepimas: " + lastFb, LEFT);
+  setFont(&OpenSans12B);
+  String concl = FeedbackConclusion();
+  if (concl.length()) concl.setCharAt(0, toupper(concl.charAt(0)));
+  drawString(30, 330, concl, LEFT);
+  // Dienos eiga: rytas / diena / vakaras (didesni)
+  DrawDayPart(160, 380, "Rytas",   FindDayPart(6, 10));
+  DrawDayPart(480, 380, "Diena",   FindDayPart(11, 16));
+  DrawDayPart(800, 380, "Vakaras", FindDayPart(17, 22));
+  drawLine(320, 372, 320, 468, LightGrey);
+  drawLine(640, 372, 640, 468, LightGrey);
+  DisplayBottomBar();
 }
 
 void DisplayWeather() {                          // 4.7" e-paper display is 960x540 resolution
-  DisplayStatusSection(600, 20, wifi_signal);    // Wi-Fi signal strength and Battery voltage
-  DisplayGeneralInfoSection();                   // Top line of the display
+  DrawTopButtonHint(false);                      // ▲ viršuje: mygtukas -> paprastas vaizdas
   DisplayDisplayWindSection(137, 150, WxConditions[0].Winddir, WxConditions[0].Windspeed, 100);
   DisplayAstronomySection(5, 255);               // Astronomy section Sun rise/set, Moon phase and Moon icon
   DisplayMainWeatherSection(320, 110);           // Centre section of display for Location, temperature, Weather report, current Wx Symbol
   DisplayWeatherIcon(810, 130);                  // Display weather icon    scale = Large;
   DisplayForecastSection(320, 220);              // 3hr forecast boxes
+  DisplayBottomBar();                            // Status baras apačioje (miestas+data+wifi+baterija)
 }
 
 //VSMOD
@@ -1118,9 +1241,9 @@ void DisplayForecastSection(int x, int y) {
     humidity_readings[r]                   = WxForecast[r].Humidity;
     r++;
   } while (r < max_readings);
-  int gwidth = 175, gheight = 100;
+  int gwidth = 175, gheight = 80;                 // sumažinti, kad tilptų status baras apačioje
   int gx = (SCREEN_WIDTH - gwidth * 4) / 5 + 8;
-  int gy = (SCREEN_HEIGHT - gheight - 30);
+  int gy = (SCREEN_HEIGHT - gheight - 62);
   int gap = gwidth + gx;
   //VSMOD TO
   //float hPa_to_mmHg(float value_hPa) // return 0.750062 * value_hPa; //675   788

@@ -44,8 +44,13 @@ mygtukas, ne RESET):
 > rodmenį — būtent tai svarbu renkantis, kaip rengtis.
 
 Paspaudus mygtuką įrenginys pabunda, parsisiunčia šviežius orus ir perpiešia ekraną kitu
-režimu (užtrunka ~20–30 s — e-ink lėtas, bet taupus). Pasirinktas režimas įsimenamas ir
-išlieka per visus miego ciklus; atjungus maitinimą grįžtama į pilną režimą.
+režimu (užtrunka ~20–30 s — e-ink lėtas, bet taupus). Pasirinktas režimas **įsimenamas
+pastovioje atmintyje** ir išlieka ne tik per miego ciklus, bet ir po perkrovimo ar maitinimo
+atjungimo.
+
+Abiejuose ekranuose viršuje rodomas **trikampis ▲** su užuomina, kurį fizinį mygtuką spausti
+(mygtukas yra viršuje, ties laiko rodmeniu), o **status baras** (miestas, data, WiFi, baterija) —
+ekrano **apačioje**.
 
 Patarimai „kaip rengtis" specialiai sukalibruoti šalčio nemėgstantiems: rekomendacijos
 visada puse laiptelio šiltesnės, frazės keičiasi kasdien, o pats „šilumos koeficientas"
@@ -88,18 +93,32 @@ Nustatymai saugomi įrenginio atmintyje ir išlieka atjungus maitinimą.
 
 ## 6. Telegram: „ar tiko apranga?" ir baterijos perspėjimai
 
-Stotelė gali bendrauti per Telegram botą (įjungimas — šio skyriaus pabaigoje):
+Stotelė gali bendrauti per Telegram botą (įjungimas — šio skyriaus pabaigoje). Botas aptarnauja
+**du žmones**: *adminą* (jus) ir *žmoną*.
 
-- **Vakare (20:00)** botas atsiunčia klausimą *„Kaip šiandien tiko apranga pagal mano
-  patarimą?"* su mygtukais: 🥶 Buvo šalta / 👍 Kaip tik / 🥵 Buvo karšta.
-- Atsakymas koreguoja patarimų „šilumos koeficientą" po 0,5 °C: jei buvo šalta — kitąkart
-  ta pati temperatūra gaus šiltesnę rekomendaciją, jei karšta — lengvesnę. Taip stotelė
-  per kelias savaites **prisitaiko prie žmogaus** (ribos: nuo −5 °C iki +1 °C korekcijos).
-- Kai baterija nusenka iki **10 %**, botas atsiunčia perspėjimą 🪫 (kartą per dieną).
+- **Vakare** (numatyta 20:00) botas atsiunčia **žmonai** klausimą *„Kaip šiandien tiko apranga
+  pagal mano patarimą?"* su keturiais mygtukais:
+  🥶 Buvo šalta / 👍 Kaip tik / 🥵 Buvo karšta / 🤷 Nesilaikiau patarimo.
+- Paspaudus mygtuką telefone **iššoka „Užskaityta ✅"**, o žinutė pasikeičia į „Atsakyta: …"
+  (mygtukai dingsta) — taip aišku, kad nuomonė gauta. Žmonos atsakymo kopiją gauna ir adminas.
+- **Adminas** gauna įrenginio būseną (`/status`, `/log`) ir **baterijos perspėjimą** 🪫, kai
+  baterija nusenka iki 10 % (kartą per dieną).
 
-Atsakyti galima bet kada — stotelė atsakymą pasiims kito pabudimo metu (per ~30 min.)
-ir patvirtins žinute. Koeficientas saugomas pastovioje atmintyje ir išlieka net atjungus
-maitinimą.
+Atsakyti galima bet kada — stotelė atsakymą pasiims kito pabudimo metu (per ~30 min.).
+
+### Kaip vertinami atsiliepimai ir kur saugomi
+
+- Patarimas parenkamas pagal **jutiminę** temperatūrą + korekciją `ChillBias`.
+- „Buvo šalta" → `ChillBias` mažėja 0,5 °C (kitąkart ta pati temperatūra gaus **šiltesnę**
+  rekomendaciją); „Buvo karšta" → didėja 0,5 °C (**lengvesnę**). Ribos: nuo −5 iki +1 °C.
+- „Nesilaikiau patarimo" koeficiento **nekeičia** — tik įskaitomas į statistiką (nes patarimas
+  nebuvo išbandytas).
+- Kaupiami skaitikliai (šalta / gerai / karšta / nesilaikyta) ir paskutinio atsiliepimo data.
+  Pagal juos daroma **išvada** (pvz. „dažniau jaučiate šaltį — renku šilčiau" arba „dažnai
+  nesilaikote patarimų"), kuri rodoma **žmonos ekrane** kartu su korekcijos reikšme ir paskutinio
+  atsiliepimo data — kad matytųsi, jog atsiliepimai veikia.
+- Viskas saugoma įrenginio **pastovioje atmintyje (NVS)** ir išlieka net atjungus maitinimą.
+  (Detalesnės istorijos SD kortelėje kol kas nėra — tai planuojama funkcija.)
 
 ### Komandos botui
 
@@ -107,25 +126,28 @@ Parašykite botui komandą — atsakymą gausite per artimiausią pabudimą (iki
 
 | Komanda | Ką daro |
 |---|---|
-| `/status` | Dabartinė būsena: laikas, temperatūra, jutiminė, drėgnumas, slėgis, vėjas, baterija, WiFi signalas, ChillBias, režimas, laisva atmintis |
+| `/status` | Būsena: laikas, temperatūra, jutiminė, drėgnumas, slėgis, vėjas, baterija, WiFi, korekcija + išvada, atsiliepimų suvestinė, režimas, atmintis |
 | `/log` | Veikimo žurnalas (kaip „serial" nuotoliniu būdu — WiFi, laikas, orų parsisiuntimas) |
 | `/wifireset` | Pamiršta WiFi tinklą ir pasileidžia iš naujo su konfigūravimo portalu |
+| `/adminas` | Užregistruoja siuntėją kaip **adminą** (būsena, baterija) |
+| `/zmona` | Užregistruoja siuntėją kaip **žmoną** (tik klausimas apie aprangą) |
 | `/help` | Komandų sąrašas |
 
-Komandas priima tik iš savininko (pirmo botui parašiusio žmogaus) telefono.
+`/status`, `/log`, `/wifireset` priimami tik iš admino telefono.
 
 ### Įjungimas
 
 1. Telefone Telegram'e susiraskite **@BotFather** → komanda `/newbot` → sugalvokite vardą.
    Gausite **token'ą** (ilga eilutė su dvitaškiu).
-2. Įrašykite token'ą į `include/owm_credentials.h` (`telegramBotToken`) ir įkelkite programą.
-3. Telegram'e susiraskite savo naują botą ir parašykite jam bet ką (pvz., „labas").
-   Stotelė per artimiausią pabudimą įsimins jūsų chat ID ir prisistatys.
+2. Įrašykite token'ą per naršyklės portalą (žr. 5 sk., laukas „Telegram bot token") arba į
+   `include/owm_credentials.h` (`telegramBotToken`) ir įkelkite programą.
+3. **Jūs** parašykite botui bet ką — tapsite adminu. **Žmona** iš savo telefono parašo `/zmona`.
+   Stotelė per artimiausią pabudimą įsimins abu ir prisistatys.
 
 ## 7. Baterija
 
 - Li-ion / LiPo baterija kraunama per USB-C jungtį.
-- 100 % ≈ 4,2 V, 0 % ≈ 3,2 V. Rodoma viršuje dešinėje.
+- 100 % ≈ 4,2 V, 0 % ≈ 3,2 V. Rodoma apatiniame status bare (dešinėje).
 - Su 30 min. intervalu ir nakties miegu baterijos paprastai užtenka keliems mėnesiams
   (priklauso nuo talpos ir WiFi signalo stiprumo).
 
@@ -172,6 +194,12 @@ atsisiųskite `OpenSans-Bold.ttf` ir nurodykite jį vietoj `segoeuib.ttf`.
 
 ## 10. Versijų istorija
 
+- **2026-07 (redizainas)** — status baras perkeltas į apačią, viršuje mygtuko indikatorius ▲;
+  žmonos režime jutiminė didele, reali mažu; maks/min/vėjas/lietus dideli su rodyklėmis;
+  aprangos blokas be rėmelio su fiksuota teksto vieta; apvalesnės drabužių ikonos; adaptacijos
+  info ekrane (korekcija, paskutinis atsiliepimas, išvada); didesni Rytas/Diena/Vakaras; Telegram
+  4-tas mygtukas „Nesilaikiau", patvirtinimas „Užskaityta ✅", du gavėjai (adminas + žmona,
+  `/adminas` `/zmona`); režimas įsimenamas po restarto (NVS).
 - **2026-07** — nustatymai per naršyklę (ilgas mygtuko paspaudimas: API raktas, lokacija,
   naktinis režimas, Telegram); žmonos režime dideliu fontu rodoma jutiminė temperatūra;
   Telegram grįžtamasis ryšys („ar tiko apranga?") su savaime besimokančiu

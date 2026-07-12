@@ -29,12 +29,44 @@ dienos eiga rytas / diena / vakaras.
 
 ![Paprastasis režimas](docs/mockup_zmonos.svg)
 
+## Drabužių parinkimo taisyklės
+
+Patarimas parenkamas pagal **jutiminę** temperatūrą (OWM `feels_like`) su pridėta korekcija
+`ChillBias` (mokosi iš atsiliepimų, žr. žemiau). Gauta reikšmė (`jaučiasi + ChillBias`) patenka
+į vieną iš juostų:
+
+| Jutiminė (su korekcija) | Drabužiai | Pavyzdinė frazė |
+|---|---|---|
+| ≥ 22 °C | maikutė | „Vasara kaip reikiant – užteks maikutės" |
+| 15–22 °C | maikutė + megztinis | „Megztinio diena: nei šalta, nei karšta" |
+| 8–15 °C | megztinis + striukė | „Oras sako: megztinis. Protas prideda: ir striukė" |
+| 0–8 °C | striukė + kepurė | „Šalta! Šilta striukė ir kepurė" |
+| < 0 °C | žieminė striukė + kepurė | „Speigas! Visa šarvuotė" |
+
+Kiekviena juosta turi 3 frazių variantus, kurie keičiasi kasdien (ta pati diena – ta pati frazė).
+Papildomi **modifikatoriai** (pridedami prie patarimo):
+
+- **Lietus** (dabar lyja arba tikimybė ≥ 35 %) → rodoma **skėčio** piktograma, „Skėtis bus geriausias draugas".
+- **Sniegas** → „batai neperšlampami" ir pridedama **kepurė**.
+- **Stiprus vėjas** (≥ 8 m/s, kai nelyja ir nesninga) → „Vėjas piktas – užsisek iki kaklo".
+
+Skėtis rodomas tik kai reikia; kitu atveju nerodomas (teksto vieta fiksuota, todėl išdėstymas
+nešokinėja).
+
 ## Savaime besimokantys patarimai (Telegram)
 
-- Vakare botas paklausia: *„Kaip šiandien tiko apranga?"* — 🥶 Buvo šalta / 👍 Kaip tik / 🥵 Buvo karšta.
-- Atsakymas koreguoja „šilumos koeficientą" (±0,5 °C, ribos −5…+1 °C, saugomas NVS) — stotelė
-  per kelias savaites prisitaiko prie šeimininkės, kuri, tarkim, nemėgsta šalčio.
-- Baterijai nusekus iki 10 % botas atsiunčia perspėjimą 🪫.
+- Vakare botas paklausia **žmonos**: *„Kaip šiandien tiko apranga?"* su keturiais mygtukais:
+  🥶 Buvo šalta / 👍 Kaip tik / 🥵 Buvo karšta / 🤷 Nesilaikiau patarimo.
+- Paspaudus mygtuką telefone iššoka patvirtinimas **„Užskaityta ✅"**, o žinutė pasikeičia į
+  „Atsakyta: …" (mygtukai dingsta), tad aišku, kad nuomonė gauta.
+- „Šalta"/„Karšta" koreguoja **šilumos koeficientą** `ChillBias` po ±0,5 °C (ribos −5…+1 °C, NVS).
+  „Nesilaikiau" koeficiento nekeičia — tik įskaitomas į statistiką. Stotelė per kelias savaites
+  prisitaiko prie šeimininkės, kuri nemėgsta šalčio, ir tai **matosi žmonos ekrane** (korekcija,
+  paskutinio atsiliepimo data ir besikeičianti išvada, pvz. „dažniau jaučiate šaltį — renku šilčiau").
+- **Du gavėjai** (vienas botas, du chat ID): *adminas* gauna būseną, baterijos perspėjimus ir
+  žmonos atsiliepimų kopijas; *žmona* gauna tik vakarinį klausimą. Registruojama komandomis
+  `/adminas` ir `/zmona`.
+- Baterijai nusekus iki 10 % adminas gauna perspėjimą 🪫.
 
 ## Savybės
 
@@ -79,13 +111,37 @@ redraws the screen. The selected mode persists across sleep cycles.
   thermometer reading smaller, plus witty plain-language advice on what to wear, with clothing
   pictograms (t-shirt, sweater, jacket, beanie, umbrella) and a morning / afternoon / evening strip.
 
+## Clothing rules
+
+Advice is chosen from the **feels-like** temperature plus a learned `ChillBias` offset (see below):
+
+| Feels-like (with offset) | Garments | Example line |
+|---|---|---|
+| ≥ 22 °C | t-shirt | "Proper summer – a t-shirt is enough" |
+| 15–22 °C | t-shirt + sweater | "Sweater day: neither cold nor hot" |
+| 8–15 °C | sweater + jacket | "Weather says sweater, sense adds a jacket" |
+| 0–8 °C | jacket + beanie | "Cold! Warm jacket and a beanie" |
+| < 0 °C | winter jacket + beanie | "Freezing! Full armour" |
+
+Each band has 3 phrasings that rotate daily. Modifiers: **rain** (or ≥ 35 % chance) adds an
+**umbrella**; **snow** adds "waterproof boots" and a beanie; **strong wind** (≥ 8 m/s) adds
+"zip up to the neck". The umbrella shows only when needed; the text position is fixed so the
+layout never shifts.
+
 ## Self-learning clothing advice (Telegram)
 
-- In the evening the bot asks *"How did today's outfit advice work out?"* with three inline
-  buttons: 🥶 Too cold / 👍 Just right / 🥵 Too warm.
-- Each answer nudges a "warmth coefficient" by ±0.5 °C (clamped to −5…+1 °C, persisted in NVS),
-  so over a few weeks the station adapts to its cold-sensitive owner.
-- When the battery drops to 10 %, the bot sends a warning 🪫.
+- In the evening the bot asks the **wife**: *"How did today's outfit advice work out?"* with four
+  inline buttons: 🥶 Too cold / 👍 Just right / 🥵 Too warm / 🤷 Didn't follow it.
+- Tapping a button pops up a **"Recorded ✅"** toast and the message updates to "Answered: …"
+  (buttons disappear), so it's clear the opinion was received.
+- Cold/Warm nudge a **warmth coefficient** `ChillBias` by ±0.5 °C (clamped to −5…+1 °C, NVS).
+  "Didn't follow" leaves the coefficient unchanged and only feeds the stats. The adaptation is
+  **visible on the wife's screen** (the offset, the last-feedback date, and a changing verdict
+  such as "you feel the cold more — dressing you warmer").
+- **Two recipients** (one bot, two chat IDs): the *admin* gets status, battery warnings and copies
+  of the wife's answers; the *wife* only gets the evening question. Registered via `/adminas`
+  and `/zmona`.
+- When the battery drops to 10 %, the admin gets a warning 🪫.
 
 No external server required — the ESP32 talks to the Telegram Bot API directly and picks up
 replies on its next wake-up.
