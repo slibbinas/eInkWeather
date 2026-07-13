@@ -941,11 +941,11 @@ void DisplayWifeMode() {
   DisplayConditionsSection(120, 92, WxConditions[0].Icon, LargeIcon);
   // Didelis skaičius - JUTIMINĖ (kaip jaučiasi); mažas ir ne centre - termometro rodmuo
   setFont(&OpenSans18B);
-  drawString(410, 26, "jaučiasi kaip", CENTER);
+  drawString(410, 18, "jaučiasi kaip", CENTER);
   setFont(&OpenSans48B);
-  drawString(410, 62, String(WxConditions[0].Feelslike, 0) + "°", CENTER);
+  drawString(410, 72, String(WxConditions[0].Feelslike, 0) + "°", CENTER);   // pastumta žemyn - nebelipa ant užrašo
   setFont(&OpenSans12B);
-  drawString(270, 148, "termometras rodo " + String(WxConditions[0].Temperature, 0) + "°", LEFT);
+  drawString(270, 156, "termometras rodo " + String(WxConditions[0].Temperature, 0) + "°", LEFT);
   // Dešinys stulpelis: maks/min/vėjas/lietus - vertikaliai, saikingas dydis su rodyklėmis
   setFont(&OpenSans18B);
   fillTriangle(628, 34, 620, 48, 636, 48, Black);   // ▲ maks
@@ -958,21 +958,23 @@ void DisplayWifeMode() {
   drawString(620, 138, "lietus " + String((int)round(pop * 100)) + "%", LEFT);
   // Aprangos patarimas - be rėmelio, tik linijos; ikonos fiksuotoje zonoje; tekstas fiksuotoje vietoje
   ClothingAdvice adv = GetClothingAdvice();
-  drawLine(20, 176, 940, 176, Black);
-  int iy = 190, is_ = 48, ix = 68;
-  if (adv.tshirt)   { DrawTShirtIcon(ix, iy, is_);   ix += 80; }
-  if (adv.sweater)  { DrawSweaterIcon(ix, iy, is_);  ix += 80; }
-  if (adv.jacket)   { DrawJacketIcon(ix, iy, is_);   ix += 80; }
-  if (adv.hat)      { DrawHatIcon(ix, iy, is_);      ix += 80; }
-  if (adv.umbrella) { DrawUmbrellaIcon(ix, iy, is_); ix += 80; } // skėtis tik kai reikia
+  drawLine(20, 174, 940, 174, Black);
+  int iy = 186, is_ = 48, ix = 60;           // platesnis tarpas, kad ikonos nesuliptų
+  #define DRAW2(FN) do { FN(ix, iy, is_); FN(ix + 1, iy + 1, is_); ix += 92; } while (0) // 2x piešimas - storesnis kontūras
+  if (adv.tshirt)   DRAW2(DrawTShirtIcon);
+  if (adv.sweater)  DRAW2(DrawSweaterIcon);
+  if (adv.jacket)   DRAW2(DrawJacketIcon);
+  if (adv.hat)      DRAW2(DrawHatIcon);
+  if (adv.umbrella) DRAW2(DrawUmbrellaIcon); // skėtis tik kai reikia
+  #undef DRAW2
   const int tx = 350;                        // FIKSUOTA teksto kairė - nepriklauso nuo ikonų (nebeišlipa)
   setFont(&OpenSans8B);
-  drawString(tx, 182, "KAIP RENGTIS", LEFT);
-  setFont(&OpenSans12B);
+  drawString(tx, 178, "KAIP RENGTIS", LEFT);
+  setFont(&OpenSans18B);                      // pagrindinė žinutė didesnė
   String text = adv.text;
-  const unsigned int maxLen = 42;            // telpa nuo tx=350 iki ~935
+  const unsigned int maxLen = 28;            // 18B: mažiau simbolių per eilutę
   int line = 0;
-  while (text.length() > 0 && line < 2) {
+  while (text.length() > 0 && line < 3) {    // iki 3 eilučių
     String chunk = text;
     if (text.length() > maxLen) {
       int split = text.lastIndexOf(' ', maxLen);
@@ -981,10 +983,10 @@ void DisplayWifeMode() {
       text = text.substring(split + 1);
     }
     else text = "";
-    drawString(tx, 206 + line * 28, chunk, LEFT);
+    drawString(tx, 200 + line * 26, chunk, LEFT);
     line++;
   }
-  drawLine(20, 268, 940, 268, Black);
+  drawLine(20, 282, 940, 282, Black);
   // Adaptacijos info: korekcija + paskutinis atsiliepimas + išvada (matosi, kad įtakoji)
   String lastFb = "-";
   if (FbLastDay > 0) {
@@ -994,17 +996,17 @@ void DisplayWifeMode() {
     lastFb = buf;
   }
   setFont(&OpenSans10B);
-  drawString(30, 286, "Korekcija " + String(ChillBias, 1) + "°     paskutinis atsiliepimas: " + lastFb, LEFT);
+  drawString(30, 300, "Korekcija " + String(ChillBias, 1) + "°     paskutinis atsiliepimas: " + lastFb, LEFT);
   setFont(&OpenSans12B);
   String concl = FeedbackConclusion();
   if (concl.length()) concl.setCharAt(0, toupper(concl.charAt(0)));
-  drawString(30, 314, concl, LEFT);
+  drawString(30, 324, concl, LEFT);
   // Dienos eiga: rytas / diena / vakaras (antraštė viršuje, ikona+temp žemiau - nesulipa)
-  DrawDayPart(160, 356, "Rytas",   FindDayPart(6, 10));
-  DrawDayPart(480, 356, "Diena",   FindDayPart(11, 16));
-  DrawDayPart(800, 356, "Vakaras", FindDayPart(17, 22));
-  drawLine(320, 350, 320, 492, LightGrey);
-  drawLine(640, 350, 640, 492, LightGrey);
+  DrawDayPart(160, 362, "Rytas",   FindDayPart(6, 10));
+  DrawDayPart(480, 362, "Diena",   FindDayPart(11, 16));
+  DrawDayPart(800, 362, "Vakaras", FindDayPart(17, 22));
+  drawLine(320, 356, 320, 492, LightGrey);
+  drawLine(640, 356, 640, 492, LightGrey);
   DisplayBottomBar();
 }
 
