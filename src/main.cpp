@@ -962,7 +962,7 @@ void DisplayWifeMode() {
   setFont(&OpenSans48B);
   drawString(410, 72, String(WxConditions[0].Feelslike, 0) + "°", CENTER);   // pastumta žemyn - nebelipa ant užrašo
   setFont(&OpenSans12B);
-  drawString(270, 156, "termometras rodo " + String(WxConditions[0].Temperature, 0) + "°", LEFT);
+  drawString(270, 150, "termometras rodo " + String(WxConditions[0].Temperature, 0) + "°", LEFT);
   // Dešinys stulpelis: DIENOS temperatūros maks/min (ne tik dabartinis), vėjas, lietus
   float dMax = WxConditions[0].Temperature, dMin = WxConditions[0].Temperature;
   for (int r = 0; r < 8; r++) {
@@ -982,8 +982,8 @@ void DisplayWifeMode() {
   drawString(620, 138, "lietus " + String((int)round(pop * 100)) + "%", LEFT);
   // Aprangos patarimas - be rėmelio, tik linijos; ikonos fiksuotoje zonoje; tekstas fiksuotoje vietoje
   ClothingAdvice adv = GetClothingAdvice();
-  drawLine(20, 174, 940, 174, Black);
-  int iy = 186, is_ = 48, ix = 60;           // platesnis tarpas, kad ikonos nesuliptų
+  drawLine(20, 172, 940, 172, Black);
+  int iy = 184, is_ = 48, ix = 60;           // platesnis tarpas, kad ikonos nesuliptų
   #define DRAW2(FN) do { FN(ix, iy, is_); FN(ix + 1, iy + 1, is_); ix += 92; } while (0) // 2x piešimas - storesnis kontūras
   if (adv.tshirt)   DRAW2(DrawTShirtIcon);
   if (adv.sweater)  DRAW2(DrawSweaterIcon);
@@ -993,7 +993,7 @@ void DisplayWifeMode() {
   #undef DRAW2
   const int tx = 350;                        // FIKSUOTA teksto kairė - nepriklauso nuo ikonų (nebeišlipa)
   setFont(&OpenSans8B);
-  drawString(tx, 178, "KAIP RENGTIS", LEFT);
+  drawString(tx, 174, "KAIP RENGTIS", LEFT);
   setFont(&OpenSans18B);                      // pagrindinė žinutė didesnė
   String text = adv.text;
   const unsigned int maxLen = 28;            // 18B: mažiau simbolių per eilutę
@@ -1007,30 +1007,32 @@ void DisplayWifeMode() {
       text = text.substring(split + 1);
     }
     else text = "";
-    drawString(tx, 200 + line * 26, chunk, LEFT);
+    drawString(tx, 192 + line * 28, chunk, LEFT);   // aukščiau, kad tilptų 3 eilutės virš linijos
     line++;
   }
-  drawLine(20, 282, 940, 282, Black);
-  // Adaptacijos info: korekcija + paskutinis atsiliepimas + išvada (matosi, kad įtakoji)
-  String lastFb = "-";
-  if (FbLastDay > 0) {
-    time_t t = (time_t)FbLastDay * 86400L;
+  drawLine(20, 288, 940, 288, Black);               // linija žemiau - nebekerta teksto
+  // Adaptacijos info: korekcija + kada klausta ir atsakyta + išvada (matosi, kad įtakoji ir kad veikia)
+  auto dayToStr = [](int dayNum) -> String {         // dienos numeris (time/86400) -> "MM-DD"
+    if (dayNum <= 0) return "-";
+    time_t t = (time_t)dayNum * 86400L;
     struct tm *lt = gmtime(&t);
     char buf[8]; sprintf(buf, "%02d-%02d", lt->tm_mon + 1, lt->tm_mday);
-    lastFb = buf;
-  }
+    return String(buf);
+  };
+  String lastAsk = dayToStr(LastAskDay);   // kada paskutinį kartą išsiųstas klausimas
+  String lastFb  = dayToStr(FbLastDay);    // kada paskutinį kartą gautas atsakymas
   setFont(&OpenSans10B);
-  drawString(30, 300, "Korekcija " + String(ChillBias, 1) + "°     paskutinis atsiliepimas: " + lastFb, LEFT);
+  drawString(30, 298, "Korekcija " + String(ChillBias, 1) + "°     klausta: " + lastAsk + "     atsakyta: " + lastFb, LEFT);
   setFont(&OpenSans12B);
   String concl = FeedbackConclusion();
   if (concl.length()) concl.setCharAt(0, toupper(concl.charAt(0)));
-  drawString(30, 324, concl, LEFT);
+  drawString(30, 322, concl, LEFT);
   // Dienos eiga: rytas / diena / vakaras (antraštė viršuje, ikona+temp žemiau - nesulipa)
-  DrawDayPart(160, 362, "Rytas",   FindDayPart(6, 10));
-  DrawDayPart(480, 362, "Diena",   FindDayPart(11, 16));
-  DrawDayPart(800, 362, "Vakaras", FindDayPart(17, 22));
-  drawLine(320, 356, 320, 492, LightGrey);
-  drawLine(640, 356, 640, 492, LightGrey);
+  DrawDayPart(160, 356, "Rytas",   FindDayPart(6, 10));
+  DrawDayPart(480, 356, "Diena",   FindDayPart(11, 16));
+  DrawDayPart(800, 356, "Vakaras", FindDayPart(17, 22));
+  drawLine(320, 352, 320, 492, LightGrey);
+  drawLine(640, 352, 640, 492, LightGrey);
   DisplayBottomBar();
 }
 
