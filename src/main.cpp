@@ -912,10 +912,10 @@ int FindDayPart(int startHour, int endHour) { // artimiausias prognozės įraša
 void DrawDayPart(int x, int y, String label, int idx) {
   if (idx < 0) return;
   setFont(&OpenSans18B);
-  drawString(x, y, label, CENTER);                                            // antraštė
-  DisplayConditionsSection(x - 42, y + 58, WxForecast[idx].Icon, SmallIcon);  // ikona kairėje
+  drawString(x, y, label, CENTER);                                            // antraštė viršuje
+  DisplayConditionsSection(x - 46, y + 86, WxForecast[idx].Icon, SmallIcon);  // ikona žemiau - nesulipa su antrašte
   setFont(&OpenSans18B);
-  drawString(x + 34, y + 48, String(WxForecast[idx].Temperature, 0) + "°", CENTER); // temp šalia, ikonos viduryje
+  drawString(x + 44, y + 78, String(WxForecast[idx].Temperature, 0) + "°", CENTER); // temp šalia ikonos vidurio
 }
 
 // Viršutinis mygtuko indikatorius: trikampis kampu į viršų ties fiziniu mygtuku
@@ -932,8 +932,8 @@ void DisplayBottomBar() {
   setFont(&OpenSans12B);
   drawString(15, 505, City, LEFT);
   drawString(150, 505, Date_str + "  @  " + Time_str, LEFT);
-  DrawBattery(680, 524);
-  DrawRSSI(862, 532, wifi_signal);
+  DrawBattery(620, 524);          // patraukta kairiau, kad įtampa nesuliptų su WiFi brūkšneliais
+  DrawRSSI(878, 532, wifi_signal);
 }
 
 void DisplayWifeMode() {
@@ -994,17 +994,17 @@ void DisplayWifeMode() {
     lastFb = buf;
   }
   setFont(&OpenSans10B);
-  drawString(30, 276, "Korekcija " + String(ChillBias, 1) + "°     paskutinis atsiliepimas: " + lastFb, LEFT);
+  drawString(30, 286, "Korekcija " + String(ChillBias, 1) + "°     paskutinis atsiliepimas: " + lastFb, LEFT);
   setFont(&OpenSans12B);
   String concl = FeedbackConclusion();
   if (concl.length()) concl.setCharAt(0, toupper(concl.charAt(0)));
-  drawString(30, 300, concl, LEFT);
-  // Dienos eiga: rytas / diena / vakaras
+  drawString(30, 314, concl, LEFT);
+  // Dienos eiga: rytas / diena / vakaras (antraštė viršuje, ikona+temp žemiau - nesulipa)
   DrawDayPart(160, 356, "Rytas",   FindDayPart(6, 10));
   DrawDayPart(480, 356, "Diena",   FindDayPart(11, 16));
   DrawDayPart(800, 356, "Vakaras", FindDayPart(17, 22));
-  drawLine(320, 348, 320, 460, LightGrey);
-  drawLine(640, 348, 640, 460, LightGrey);
+  drawLine(320, 350, 320, 492, LightGrey);
+  drawLine(640, 350, 640, 492, LightGrey);
   DisplayBottomBar();
 }
 
