@@ -770,6 +770,17 @@ struct ClothingAdvice {
 ClothingAdvice GetClothingAdvice() {
   ClothingAdvice a = {"", false, false, false, false, false};
   float feels = WxConditions[0].Feelslike + ChillBias; // šalčmyrės korekcija: mokosi iš Telegram atsakymų
+  // Dienos jutiminės temperatūros diapazonas (artimiausios dienos valandos) - kad patarimas
+  // atspindėtų ne tik dabar, bet ir kaip keisis oras dienos bėgyje
+  float feelsMax = feels, feelsMin = feels;
+  for (int r = 0; r < 8; r++) {                         // ~24 val. į priekį (3 val. žingsnis)
+    time_t ft = WxForecast[r].Dt;
+    struct tm *flt = localtime(&ft);
+    if (flt->tm_hour < 6 || flt->tm_hour > 22) continue; // tik dienos metas
+    float f = WxForecast[r].Feelslike + ChillBias;
+    if (f > feelsMax) feelsMax = f;
+    if (f < feelsMin) feelsMin = f;
+  }
   bool rainy  = (WxConditions[0].Rainfall > 0.1) || (WxForecast[0].Pop >= 0.35) || (WxForecast[1].Pop >= 0.35);
   bool snowy  = (WxConditions[0].Snowfall > 0.05) || (WxForecast[0].Snowfall > 0.1);
   bool windy  = (WxConditions[0].Windspeed >= 8);
@@ -809,9 +820,15 @@ ClothingAdvice GetClothingAdvice() {
                         "Šalčio ataka! Storiausia striukė ir arbata termose"};
     a.text = v[day];
   }
-  if (snowy)      { a.text += ". Sninga - batai neperšlampami!"; a.hat = true; }
-  else if (rainy) { a.text += ". Skėtis bus geriausias draugas!"; a.umbrella = true; }
-  if (windy && !snowy && !rainy) a.text += ". Vėjas piktas - užsisek iki kaklo!";
+  // Dienos pokytis - iškart po baziniu patarimu (svarbu, kad išliktų net apkarpius ilgą tekstą)
+  if (feelsMax - feels >= 6)
+    a.text += ". Po pietų iki " + String((int)round(feelsMax)) + "° - renkis sluoksniais";
+  else if (feels - feelsMin >= 6)
+    a.text += ". Vakare atvės iki " + String((int)round(feelsMin)) + "° - pasiimk šiltesnį";
+  // Krituliai/vėjas (ikonos nustatomos nepriklausomai nuo teksto ilgio)
+  if (snowy)      { a.text += ". Sninga - neperšlampami batai!"; a.hat = true; }
+  else if (rainy) { a.text += ". Skėtis būtinas!"; a.umbrella = true; }
+  else if (windy) a.text += ". Vėjas piktas!";
   return a;
 }
 
@@ -946,12 +963,19 @@ void DisplayWifeMode() {
   drawString(410, 72, String(WxConditions[0].Feelslike, 0) + "°", CENTER);   // pastumta žemyn - nebelipa ant užrašo
   setFont(&OpenSans12B);
   drawString(270, 156, "termometras rodo " + String(WxConditions[0].Temperature, 0) + "°", LEFT);
-  // Dešinys stulpelis: maks/min/vėjas/lietus - vertikaliai, saikingas dydis su rodyklėmis
+  // Dešinys stulpelis: DIENOS temperatūros maks/min (ne tik dabartinis), vėjas, lietus
+  float dMax = WxConditions[0].Temperature, dMin = WxConditions[0].Temperature;
+  for (int r = 0; r < 8; r++) {
+    time_t ft = WxForecast[r].Dt; struct tm *flt = localtime(&ft);
+    if (flt->tm_hour < 6 || flt->tm_hour > 22) continue; // tik dienos metas
+    if (WxForecast[r].Temperature > dMax) dMax = WxForecast[r].Temperature;
+    if (WxForecast[r].Temperature < dMin) dMin = WxForecast[r].Temperature;
+  }
   setFont(&OpenSans18B);
-  fillTriangle(628, 34, 620, 48, 636, 48, Black);   // ▲ maks
-  drawString(646, 32, String(WxConditions[0].High, 0) + "°", LEFT);
-  fillTriangle(628, 82, 620, 68, 636, 68, Black);   // ▼ min
-  drawString(646, 66, String(WxConditions[0].Low, 0) + "°", LEFT);
+  fillTriangle(628, 34, 620, 48, 636, 48, Black);   // ▲ dienos maks
+  drawString(646, 32, String(dMax, 0) + "°", LEFT);
+  fillTriangle(628, 82, 620, 68, 636, 68, Black);   // ▼ dienos min
+  drawString(646, 66, String(dMin, 0) + "°", LEFT);
   setFont(&OpenSans12B);
   drawString(620, 108, String(WxConditions[0].Windspeed, 0) + " m/s " + WindDegToOrdinalDirection(WxConditions[0].Winddir), LEFT);
   float pop = max(WxForecast[0].Pop, max(WxForecast[1].Pop, WxForecast[2].Pop));
