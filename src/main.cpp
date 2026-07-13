@@ -1021,8 +1021,12 @@ void DisplayWifeMode() {
   };
   String lastAsk = dayToStr(LastAskDay);   // kada paskutinį kartą išsiųstas klausimas
   String lastFb  = dayToStr(FbLastDay);    // kada paskutinį kartą gautas atsakymas
+  int todayNum = (int)(time(NULL) / 86400);
+  String nextAsk = (LastAskDay != todayNum && CurrentHour < FeedbackHr) // kada bus klausiama kitą kartą
+                   ? ("šiandien " + String(FeedbackHr) + ":00")
+                   : ("rytoj " + String(FeedbackHr) + ":00");
   setFont(&OpenSans10B);
-  drawString(30, 298, "Korekcija " + String(ChillBias, 1) + "°     klausta: " + lastAsk + "     atsakyta: " + lastFb, LEFT);
+  drawString(30, 298, "Korekcija " + String(ChillBias, 1) + "°    klausta: " + lastAsk + "    atsakyta: " + lastFb + "    kitas: " + nextAsk, LEFT);
   setFont(&OpenSans12B);
   String concl = FeedbackConclusion();
   if (concl.length()) concl.setCharAt(0, toupper(concl.charAt(0)));

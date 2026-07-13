@@ -67,6 +67,12 @@ KRITINĖS PASTABOS:
 - ReadBattery() atskirtas nuo piešimo; baterijos % constrain.
 - Ištaisyta: SumOfPrecip off-by-one (rodydavo sniegą vietoj drėgnumo), framebuffer NULL apsauga.
 
+BŪSENA (2026-07): firmware pilnas ir kompiliuojasi; žmonos režimas nušlifuotas (blokų aukščiai,
+klausta/atsakyta datos, aprangos patarimas atsižvelgia į dienos oro pokytį). Firmware dar
+NEĮKELTAS į fizinį įrenginį — ekranų išdėstymą gali reikėti koreguoti pagal nuotrauką.
+KAS TOLIAU: įkėlimas į įrenginį ir išdėstymo patikra; SD kortelės žurnalas (atsakymų istorija,
+koeficientai pagal sezonus); pasirinktinai WhatsApp dubliavimas per CallMeBot.
+
 Projekto katalogas: C:\Users\SViktoras\Documents\PlatformIO\Projects\eInkWeather
 Repo privatus: github.com/slibbinas/eInkWeather (push per Windows Credential Manager; gh CLI nėra).
 ```
