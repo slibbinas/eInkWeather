@@ -912,10 +912,10 @@ int FindDayPart(int startHour, int endHour) { // artimiausias prognozės įraša
 void DrawDayPart(int x, int y, String label, int idx) {
   if (idx < 0) return;
   setFont(&OpenSans18B);
-  drawString(x, y, label, CENTER);                                            // didesnė antraštė
-  DisplayConditionsSection(x - 48, y + 62, WxForecast[idx].Icon, SmallIcon);  // ikona kairėje
-  setFont(&OpenSans24B);
-  drawString(x + 40, y + 50, String(WxForecast[idx].Temperature, 0) + "°", CENTER); // temp iki ikonos vidurio
+  drawString(x, y, label, CENTER);                                            // antraštė
+  DisplayConditionsSection(x - 42, y + 58, WxForecast[idx].Icon, SmallIcon);  // ikona kairėje
+  setFont(&OpenSans18B);
+  drawString(x + 34, y + 48, String(WxForecast[idx].Temperature, 0) + "°", CENTER); // temp šalia, ikonos viduryje
 }
 
 // Viršutinis mygtuko indikatorius: trikampis kampu į viršų ties fiziniu mygtuku
@@ -937,41 +937,40 @@ void DisplayBottomBar() {
 }
 
 void DisplayWifeMode() {
-  DrawTopButtonHint(true);
-  // Didelė orų piktograma kairėje
-  DisplayConditionsSection(120, 108, WxConditions[0].Icon, LargeIcon);
+  // Be viršutinio mygtuko užrašo. Didelė orų piktograma kairėje
+  DisplayConditionsSection(120, 92, WxConditions[0].Icon, LargeIcon);
   // Didelis skaičius - JUTIMINĖ (kaip jaučiasi); mažas ir ne centre - termometro rodmuo
   setFont(&OpenSans18B);
-  drawString(415, 40, "jaučiasi kaip", CENTER);
+  drawString(410, 26, "jaučiasi kaip", CENTER);
   setFont(&OpenSans48B);
-  drawString(415, 78, String(WxConditions[0].Feelslike, 0) + "°", CENTER);
+  drawString(410, 62, String(WxConditions[0].Feelslike, 0) + "°", CENTER);
   setFont(&OpenSans12B);
-  drawString(270, 176, "termometras rodo " + String(WxConditions[0].Temperature, 0) + "°", LEFT);
-  // Dešinys stulpelis: maks/min/vėjas/lietus dideli su rodyklėmis
-  setFont(&OpenSans24B);
-  fillTriangle(624, 54, 616, 68, 632, 68, Black);   // ▲ maks
-  drawString(640, 50, String(WxConditions[0].High, 0) + "°", LEFT);
-  fillTriangle(748, 68, 740, 54, 756, 54, Black);   // ▼ min
-  drawString(764, 50, String(WxConditions[0].Low, 0) + "°", LEFT);
+  drawString(270, 148, "termometras rodo " + String(WxConditions[0].Temperature, 0) + "°", LEFT);
+  // Dešinys stulpelis: maks/min/vėjas/lietus - vertikaliai, saikingas dydis su rodyklėmis
   setFont(&OpenSans18B);
-  drawString(620, 104, String(WxConditions[0].Windspeed, 0) + " m/s " + WindDegToOrdinalDirection(WxConditions[0].Winddir), LEFT);
+  fillTriangle(628, 34, 620, 48, 636, 48, Black);   // ▲ maks
+  drawString(646, 32, String(WxConditions[0].High, 0) + "°", LEFT);
+  fillTriangle(628, 82, 620, 68, 636, 68, Black);   // ▼ min
+  drawString(646, 66, String(WxConditions[0].Low, 0) + "°", LEFT);
+  setFont(&OpenSans12B);
+  drawString(620, 108, String(WxConditions[0].Windspeed, 0) + " m/s " + WindDegToOrdinalDirection(WxConditions[0].Winddir), LEFT);
   float pop = max(WxForecast[0].Pop, max(WxForecast[1].Pop, WxForecast[2].Pop));
-  drawString(620, 142, "lietus " + String((int)round(pop * 100)) + "%", LEFT);
+  drawString(620, 138, "lietus " + String((int)round(pop * 100)) + "%", LEFT);
   // Aprangos patarimas - be rėmelio, tik linijos; ikonos fiksuotoje zonoje; tekstas fiksuotoje vietoje
   ClothingAdvice adv = GetClothingAdvice();
-  drawLine(20, 196, 940, 196, Black);
-  int iy = 212, is_ = 52, ix = 70;
-  if (adv.tshirt)   { DrawTShirtIcon(ix, iy, is_);   ix += 84; }
-  if (adv.sweater)  { DrawSweaterIcon(ix, iy, is_);  ix += 84; }
-  if (adv.jacket)   { DrawJacketIcon(ix, iy, is_);   ix += 84; }
-  if (adv.hat)      { DrawHatIcon(ix, iy, is_);      ix += 84; }
-  if (adv.umbrella) { DrawUmbrellaIcon(ix, iy, is_); ix += 84; } // skėtis tik kai reikia
-  const int tx = 360;                        // FIKSUOTA teksto kairė - nepriklauso nuo ikonų (nebeišlipa)
+  drawLine(20, 176, 940, 176, Black);
+  int iy = 190, is_ = 48, ix = 68;
+  if (adv.tshirt)   { DrawTShirtIcon(ix, iy, is_);   ix += 80; }
+  if (adv.sweater)  { DrawSweaterIcon(ix, iy, is_);  ix += 80; }
+  if (adv.jacket)   { DrawJacketIcon(ix, iy, is_);   ix += 80; }
+  if (adv.hat)      { DrawHatIcon(ix, iy, is_);      ix += 80; }
+  if (adv.umbrella) { DrawUmbrellaIcon(ix, iy, is_); ix += 80; } // skėtis tik kai reikia
+  const int tx = 350;                        // FIKSUOTA teksto kairė - nepriklauso nuo ikonų (nebeišlipa)
   setFont(&OpenSans8B);
-  drawString(tx, 200, "KAIP RENGTIS", LEFT);
+  drawString(tx, 182, "KAIP RENGTIS", LEFT);
   setFont(&OpenSans12B);
   String text = adv.text;
-  const unsigned int maxLen = 40;            // telpa nuo tx=360 iki ~930
+  const unsigned int maxLen = 42;            // telpa nuo tx=350 iki ~935
   int line = 0;
   while (text.length() > 0 && line < 2) {
     String chunk = text;
@@ -982,10 +981,10 @@ void DisplayWifeMode() {
       text = text.substring(split + 1);
     }
     else text = "";
-    drawString(tx, 226 + line * 30, chunk, LEFT);
+    drawString(tx, 206 + line * 28, chunk, LEFT);
     line++;
   }
-  drawLine(20, 298, 940, 298, Black);
+  drawLine(20, 268, 940, 268, Black);
   // Adaptacijos info: korekcija + paskutinis atsiliepimas + išvada (matosi, kad įtakoji)
   String lastFb = "-";
   if (FbLastDay > 0) {
@@ -995,27 +994,28 @@ void DisplayWifeMode() {
     lastFb = buf;
   }
   setFont(&OpenSans10B);
-  drawString(30, 306, "Korekcija " + String(ChillBias, 1) + "°     paskutinis atsiliepimas: " + lastFb, LEFT);
+  drawString(30, 276, "Korekcija " + String(ChillBias, 1) + "°     paskutinis atsiliepimas: " + lastFb, LEFT);
   setFont(&OpenSans12B);
   String concl = FeedbackConclusion();
   if (concl.length()) concl.setCharAt(0, toupper(concl.charAt(0)));
-  drawString(30, 330, concl, LEFT);
-  // Dienos eiga: rytas / diena / vakaras (didesni)
-  DrawDayPart(160, 380, "Rytas",   FindDayPart(6, 10));
-  DrawDayPart(480, 380, "Diena",   FindDayPart(11, 16));
-  DrawDayPart(800, 380, "Vakaras", FindDayPart(17, 22));
-  drawLine(320, 372, 320, 468, LightGrey);
-  drawLine(640, 372, 640, 468, LightGrey);
+  drawString(30, 300, concl, LEFT);
+  // Dienos eiga: rytas / diena / vakaras
+  DrawDayPart(160, 356, "Rytas",   FindDayPart(6, 10));
+  DrawDayPart(480, 356, "Diena",   FindDayPart(11, 16));
+  DrawDayPart(800, 356, "Vakaras", FindDayPart(17, 22));
+  drawLine(320, 348, 320, 460, LightGrey);
+  drawLine(640, 348, 640, 460, LightGrey);
   DisplayBottomBar();
 }
 
 void DisplayWeather() {                          // 4.7" e-paper display is 960x540 resolution
-  DrawTopButtonHint(false);                      // ▲ viršuje: mygtukas -> paprastas vaizdas
-  DisplayDisplayWindSection(137, 150, WxConditions[0].Winddir, WxConditions[0].Windspeed, 100);
-  DisplayAstronomySection(5, 255);               // Astronomy section Sun rise/set, Moon phase and Moon icon
-  DisplayMainWeatherSection(320, 110);           // Centre section of display for Location, temperature, Weather report, current Wx Symbol
-  DisplayWeatherIcon(810, 130);                  // Display weather icon    scale = Large;
-  DisplayForecastSection(320, 220);              // 3hr forecast boxes
+  // Tas pats išdėstymas kaip anksčiau, tik viskas pastumta ~30 px aukštyn (atsilaisvino viršus),
+  // o info/status juosta perkelta į apačią (DisplayBottomBar). Grafikai - pilno dydžio.
+  DisplayDisplayWindSection(137, 120, WxConditions[0].Winddir, WxConditions[0].Windspeed, 100);
+  DisplayAstronomySection(5, 225);
+  DisplayMainWeatherSection(320, 80);
+  DisplayWeatherIcon(810, 100);
+  DisplayForecastSection(320, 190);              // 3hr forecast boxes
   DisplayBottomBar();                            // Status baras apačioje (miestas+data+wifi+baterija)
 }
 
@@ -1241,9 +1241,9 @@ void DisplayForecastSection(int x, int y) {
     humidity_readings[r]                   = WxForecast[r].Humidity;
     r++;
   } while (r < max_readings);
-  int gwidth = 175, gheight = 80;                 // sumažinti, kad tilptų status baras apačioje
+  int gwidth = 175, gheight = 100;                // pilno dydžio grafikai (skaičiai nebesusistumia)
   int gx = (SCREEN_WIDTH - gwidth * 4) / 5 + 8;
-  int gy = (SCREEN_HEIGHT - gheight - 62);
+  int gy = (SCREEN_HEIGHT - gheight - 65);         // pakelti, kad apačioje tilptų status baras
   int gap = gwidth + gx;
   //VSMOD TO
   //float hPa_to_mmHg(float value_hPa) // return 0.750062 * value_hPa; //675   788
