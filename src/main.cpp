@@ -41,7 +41,7 @@
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
-#define FW_VERSION 4             // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
+#define FW_VERSION 5             // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -1476,6 +1476,14 @@ void DrawTopButtonHint(bool wifeMode) {
 }
 
 // Apatinis baras: miestas + data + WiFi + baterija (abu režimai), linija virš jo
+// Versijos žymė viršutiniame dešiniame kampe. Region VER: x 908..953, y 4..24 (10B).
+// Laisva zona ABIEJUOSE ekranuose - žr. kolizijų patikrą (dešinio stulpelio tekstai baigiasi
+// x<=766; pilno ekrano ikona viršuje y>=40, dešinėje x<=880). Kviečiama paskutinė - font state nesvarbus.
+void DrawVersionTag() {
+  setFont(&OpenSans10B);
+  drawStringTop(953, 4, "v" + String(FW_VERSION), RIGHT);
+}
+
 void DisplayBottomBar() {
   drawLine(5, 498, 955, 498, Grey);
   setFont(&OpenSans12B);
@@ -1572,6 +1580,7 @@ void DisplayWifeMode() {
   drawLine(640, 390, 640, 490, LightGrey);
 
   DisplayBottomBar();                                                                 // L3 + R5
+  DrawVersionTag();                                                                   // VER: viršus dešinėje
 }
 
 void DisplayWeather() {                          // 4.7" e-paper display is 960x540 resolution
@@ -1583,6 +1592,7 @@ void DisplayWeather() {                          // 4.7" e-paper display is 960x
   DisplayWeatherIcon(810, 100);
   DisplayForecastSection(320, 190);              // 3hr forecast boxes
   DisplayBottomBar();                            // Status baras apačioje (miestas+data+wifi+baterija)
+  DrawVersionTag();                              // VER: viršus dešinėje
 }
 
 //VSMOD
