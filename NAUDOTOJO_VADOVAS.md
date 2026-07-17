@@ -139,14 +139,21 @@ Parašykite botui komandą — atsakymą gausite per artimiausią pabudimą (iki
 | `/statistika` | adminas **ir** žmona | Savaitės atsiliepimų suvestinė: kurią dieną ką paspaudė, sumos, korekcija, išvada |
 | `/vadovas` | adminas **ir** žmona | Šis naudotojo vadovas Telegram chat'e |
 | `/demo` | adminas **ir** žmona | Interaktyvaus prototipo nuoroda naršyklėje (<https://tinymakerwifi.com/orai>) |
+| `/laikas HH:MM` | adminas **ir** žmona | Nustato vakarinio klausimo laiką |
+| `/foto` `/emoji` | adminas | Vakarinis klausimas su drabužių **nuotrauka** (numatyta) ar **emoji** |
 | `/atnaujinti` | adminas | Patikrina git ir įsidiegia naujausią firmware (savarankiškas OTA) |
-| `/laikas HH:MM` | adminas | Nustato vakarinio klausimo laiką |
+| `/pat github_pat_…` | adminas | Įveda GitHub raktą (fine-grained PAT) savarankiškam atnaujinimui |
 | `/ota 19750504` | adminas | Įjungia OTA režimą laidiniam/belaidžiam kėlimui (raktas — nustatomas portale) |
 | `/kvietimas` | adminas | Paruošia persiunčiamą kvietimą — gavėjui užtenka nuorodos ir PRADĖTI |
-| `/vardas Justina` | adminas | Kaip kreiptis į atsakinėjantį žmogų („Labas, Justina!", statistikoje, kopijose) |
+| `/vardas` | adminas | Kaip kreiptis į atsakinėjantį žmogų (pasisveikinimuose, statistikoje, kopijose) |
 | `/log` | adminas | Veikimo žurnalas (kaip „serial" nuotoliniu būdu) |
 | `/zmona` `/adminas` | bet kas | Registracija ranka (paprastai nereikia — naudokite `/kvietimas`) |
 | `/help` | adminas | Komandų sąrašas |
+
+**Komandų meniu** (mėlynas „/" mygtukas) nustatomas **automatiškai** — ateina su firmware per
+`/atnaujinti` (BotFather rankomis nereikia). Adminas mato visą sąrašą; **žmona — tik `/statistika`
+ir `/laikas`** (jai daugiau nereikia). Meniu atsinaujina po kiekvieno firmware atnaujinimo arba
+žmonai užsiregistravus.
 
 **Atsakinėtojo keitimas:** išsiųskite `/kvietimas` kitam žmogui — kas paspaus PRADĖTI, tas
 perima registraciją, ir nuo tada skaitomi tik jo paspaudimai. Nepamirškite atnaujinti

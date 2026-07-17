@@ -42,7 +42,7 @@
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
-#define FW_VERSION 10            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
+#define FW_VERSION 11            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -851,6 +851,45 @@ void TgSendPhoto(const String& chatId, const String& photoUrl, const String& cap
   TgApiCall("sendPhoto", body);
 }
 
+// Boto komandų MENIU (setMyCommands) - nustatomas paties įrenginio, ateina su firmware per OTA
+// (BotFather rankomis nebereikia). Adminui/visiems - pilnas sąrašas; žmonos chat'ui - tik /statistika + /laikas.
+static void tgAddCmd(JsonArray& a, const char* c, const char* d) {
+  JsonObject o = a.createNestedObject(); o["command"] = c; o["description"] = d;
+}
+void TgSetupMenus() {
+  {                                                    // 1. Numatytas (adminui / visiems) - pilnas sąrašas
+    DynamicJsonDocument doc(3072);
+    JsonArray a = doc.createNestedArray("commands");
+    tgAddCmd(a, "status", "Busena: baterija, WiFi, versija");
+    tgAddCmd(a, "statistika", "Savaites atsiliepimu suvestine");
+    tgAddCmd(a, "vadovas", "Naudotojo vadovas");
+    tgAddCmd(a, "foto", "Vakarinis klausimas su nuotrauka");
+    tgAddCmd(a, "emoji", "Vakarinis klausimas su emoji");
+    tgAddCmd(a, "demo", "Interaktyvus demo narsykleje");
+    tgAddCmd(a, "laikas", "Nustatyti klausimo laika (HH:MM)");
+    tgAddCmd(a, "kvietimas", "Sugeneruoti kvietima kitam");
+    tgAddCmd(a, "vardas", "Nustatyti kreipini varda");
+    tgAddCmd(a, "atnaujinti", "Patikrinti ir idiegti nauja firmware");
+    tgAddCmd(a, "pat", "Ivesti GitHub rakta atsinaujinimui");
+    tgAddCmd(a, "ota", "Ijungti OTA ikelimo rezima");
+    tgAddCmd(a, "log", "Veikimo zurnalas");
+    String body; serializeJson(doc, body);
+    TgApiCall("setMyCommands", body);
+  }
+  String wife = prefs.getString("chatWife", "");       // 2. Žmonos chat'as - tik statistika + laikas
+  if (wife.length()) {
+    DynamicJsonDocument doc(1024);
+    JsonArray a = doc.createNestedArray("commands");
+    tgAddCmd(a, "statistika", "Savaites atsiliepimu suvestine");
+    tgAddCmd(a, "laikas", "Nustatyti klausimo laika (HH:MM)");
+    JsonObject s = doc.createNestedObject("scope");
+    s["type"] = "chat";
+    s["chat_id"] = wife;                               // Telegram priima ir string chat_id
+    String body; serializeJson(doc, body);
+    TgApiCall("setMyCommands", body);
+  }
+}
+
 // Reply mygtuko tekstas -> atsiliepimo kodas
 String FbCodeFromText(const String& t) {
   if (t.indexOf("šalta") >= 0)       return "FB_COLD";
@@ -1023,6 +1062,13 @@ void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
   if (TgToken.length() == 0) return;
   String admin = prefs.getString("chatAdmin", prefs.getString("chatId", String(telegramChatID)));
   String wife  = prefs.getString("chatWife", "");
+  // Boto meniu nustatomas automatiškai (ateina su firmware per OTA) - po versijos pokyčio arba
+  // žmonai užsiregistravus. Perrašomas tik tada (ne kas ciklą), pagal menuVer/menuWife NVS.
+  if (prefs.getInt("menuVer", 0) != FW_VERSION || prefs.getString("menuWife", "") != wife) {
+    TgSetupMenus();
+    prefs.putInt("menuVer", FW_VERSION);
+    prefs.putString("menuWife", wife);
+  }
   long offset = prefs.getLong("tgOffset", 0);
   // 1. Pasiimti naujus atsakymus/žinutes.
   // SVARBU: limit=3 (ne 20) + didesnis doc. callback_query update'as stambus (jame kartojama visa
@@ -1076,6 +1122,7 @@ void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
           else if (cid == wife && lc.startsWith("/statistika")) TgSendMessage(cid, StatsMessage(), false); // žmonai - statistika
           else if (cid == wife && lc.startsWith("/vadovas")) SendManual(cid);                              // žmonai - vadovas
           else if (cid == wife && lc.startsWith("/demo")) TgSendMessage(cid, "🖥 Interaktyvus stotelės demo naršyklėje:\nhttps://tinymakerwifi.com/orai", false);
+          else if (cid == wife && lc.startsWith("/laikas")) HandleTgCommand(text, cid);                       // žmonai - klausimo laikas
         }
       }
     }
