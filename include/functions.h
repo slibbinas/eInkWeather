@@ -53,6 +53,7 @@ void ReadBattery();
 void TelegramSync();
 void StartOtaMode();
 void TelegramTestMode();
+void SaveDailyAdvice();
 void DisplayForecastWeather(int x, int y, int index);
 void DisplayAstronomySection(int x, int y);
 void DisplayForecastSection(int x, int y);

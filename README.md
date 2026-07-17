@@ -88,6 +88,13 @@ nešokinėja).
 
 Išsamiau — [NAUDOTOJO_VADOVAS.md](NAUDOTOJO_VADOVAS.md).
 
+## Interaktyvus prototipas
+
+[docs/prototipas.html](docs/prototipas.html) — įrenginio ekrano, mygtuko pakopų (trumpas /
+3–8 s / ≥8 s) ir Telegram grandinės simuliacija naršyklėje: perjunkite režimus, atidarykite
+portalą, paleiskite OTA su progreso juosta, atsakykite į vakarinį klausimą ir stebėkite, kaip
+keičiasi ekranas. Atsisiųskite failą ir atverkite naršyklėje.
+
 ---
 
 <a name="english"></a>
@@ -165,6 +172,10 @@ replies on its next wake-up.
 3. Provision WiFi from your phone via the captive portal — instructions appear on the display.
 
 Full user manual (in Lithuanian): [NAUDOTOJO_VADOVAS.md](NAUDOTOJO_VADOVAS.md).
+
+**Interactive prototype**: [docs/prototipas.html](docs/prototipas.html) — browser simulation of
+the e-ink screen, the three button-hold tiers and the Telegram feedback loop (download and open
+locally).
 
 ---
 

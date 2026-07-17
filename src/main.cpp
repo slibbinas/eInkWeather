@@ -160,24 +160,6 @@ boolean SetupTime() {
 
 const char* WIFI_AP_NAME = "OruStotele-Setup"; // Konfigūravimo AP pavadinimas
 
-void ConfigModeCallback(WiFiManager *wm) {
-  // Rodomos instrukcijos e-ink ekrane, kai atsidaro konfigūravimo portalas
-  epd_poweron();
-  epd_clear();
-  setFont(&OpenSans18B);
-  drawString(SCREEN_WIDTH / 2, 120, "WiFi nesukonfigūruotas", CENTER);
-  setFont(&OpenSans12B);
-  drawString(SCREEN_WIDTH / 2, 200, "1. Telefonu prisijunkite prie WiFi tinklo:", CENTER);
-  setFont(&OpenSans18B);
-  drawString(SCREEN_WIDTH / 2, 240, String(WIFI_AP_NAME), CENTER);
-  setFont(&OpenSans12B);
-  drawString(SCREEN_WIDTH / 2, 300, "2. Naršyklėje atidarykite: 192.168.4.1", CENTER);
-  drawString(SCREEN_WIDTH / 2, 340, "3. Pasirinkite savo tinklą ir įveskite slaptažodį", CENTER);
-  drawString(SCREEN_WIDTH / 2, 420, "Portalas veiks 3 minutes", CENTER);
-  edp_update();
-  epd_poweroff_all();
-}
-
 uint8_t StartWiFi() {
   WiFi.mode(WIFI_STA);
   WiFiManager wm;
@@ -185,17 +167,11 @@ uint8_t StartWiFi() {
     wm.setDebugOutput(false);
   #endif
   wm.setConnectTimeout(20); // sek. bandymui jungtis prie išsaugoto tinklo
-  bool coldBoot = (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_UNDEFINED);
-  if (!coldBoot) {
-    // Pabudimas iš miego (taimeris ar mygtukas): portalo neatidaryti (taupom bateriją)
-    wm.setEnableConfigPortal(false);
-  }
-  else {
-    // Pirmas paleidimas / RESET mygtukas: nepavykus prisijungti atidaryti portalą
-    if (!wm.getWiFiIsSaved() && strlen(ssid) > 0) wm.preloadWiFi(ssid, password); // pradinis užpildymas iš owm_credentials.h, jei yra
-    wm.setConfigPortalTimeout(180);
-    wm.setAPCallback(ConfigModeCallback);
-  }
+  // Portalas automatiškai NEatidaromas niekada - jis pasiekiamas tik sąmoningai,
+  // palaikius mygtuką 3-8 s (StartConfigPortal). Nepavykus prisijungti - informacinis
+  // langas (setup) ir kartojama kas 30 min.
+  wm.setEnableConfigPortal(false);
+  if (!wm.getWiFiIsSaved() && strlen(ssid) > 0) wm.preloadWiFi(ssid, password); // pradinis užpildymas iš owm_credentials.h, jei yra
   if (wm.autoConnect(WIFI_AP_NAME)) {
     wifi_signal = WiFi.RSSI(); // Get Wifi Signal strength now, because the WiFi will be turned off to save power!
     LOGT("WiFi OK " + WiFi.localIP().toString() + " RSSI=" + String(wifi_signal));
@@ -358,14 +334,17 @@ void StartOtaMode() {
     }
   });
   ArduinoOTA.onEnd([]() {
+    fillRect(0, 396, SCREEN_WIDTH, 144, White);            // nuvalom užuominą buferyje - kitaip tekstai užliptų
+    fillRect(OTA_BAR_X, OTA_BAR_Y, OTA_BAR_W, OTA_BAR_H, Black); // pilna juosta ir buferyje (pilnas refresh jos neištrintų)
     setFont(&OpenSans18B);
-    drawStringTop(SCREEN_WIDTH / 2, 410, "Įkelta! Perkraunama...", CENTER);
+    drawStringTop(SCREEN_WIDTH / 2, 420, "Įkelta! Perkraunama...", CENTER);
     edp_update();
     epd_poweroff_all();                        // po šio callback'o ArduinoOTA pats perkrauna
   });
   ArduinoOTA.onError([](ota_error_t e) {
+    fillRect(0, 396, SCREEN_WIDTH, 144, White);
     setFont(&OpenSans18B);
-    drawStringTop(SCREEN_WIDTH / 2, 410, "OTA klaida " + String((int)e) + " - perkraunama", CENTER);
+    drawStringTop(SCREEN_WIDTH / 2, 420, "OTA klaida " + String((int)e) + " - perkraunama", CENTER);
     edp_update();
     epd_poweroff_all();
     delay(2000);
@@ -456,6 +435,7 @@ void setup() {
       LOGT("Orai w=" + String(RxWeather) + " f=" + String(RxForecast) +
            (RxWeather ? (" T=" + String(WxConditions[0].Temperature, 1) + " jaučiasi=" + String(WxConditions[0].Feelslike, 1)) : ""));
       if (RxWeather && RxForecast) { // Only if received both Weather or Forecast proceed
+        SaveDailyAdvice();  // Ryto patarimas įsimenamas - vakare Telegram klausime cituojama, kas buvo siūlyta
         TelegramSync();     // Atsakymai, koeficiento korekcija, perspėjimai - kol WiFi dar veikia
         StopWiFi();         // Reduces power consumption
         epd_poweron();      // Switch on EPD display
@@ -466,6 +446,20 @@ void setup() {
         epd_poweroff_all(); // Switch off all power to EPD
       }
     }
+  }
+  else if (wakeCause != ESP_SLEEP_WAKEUP_TIMER) {
+    // Šaltas paleidimas ar mygtukas, o prisijungti nepavyko: parodom, kas vyksta ir ką daryti.
+    // Portalas automatiškai nebeatidaromas - tik sąmoningai (mygtukas 3-8 s). Taimerio
+    // pabudimams ekrano nekeičiam (naktį/router'io dingimui - tyliai bandom kas 30 min.)
+    epd_poweron();
+    ClearScreen();
+    setFont(&OpenSans18B);
+    drawStringTop(SCREEN_WIDTH / 2, 150, "Nepavyko prisijungti prie WiFi", CENTER);
+    setFont(&OpenSans12B);
+    drawStringTop(SCREEN_WIDTH / 2, 240, "WiFi nustatymui palaikykite mygtuką 3-8 sek.", CENTER);
+    drawStringTop(SCREEN_WIDTH / 2, 280, "Kitaip bandysiu jungtis vėl kas 30 min.", CENTER);
+    edp_update();
+    epd_poweroff_all();
   }
   BeginSleep();
 }
@@ -876,7 +870,12 @@ void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
   // 3. Vakarinis klausimas apie aprangą -> žmonai (jei nustatyta), kitaip adminui (kartą per dieną)
   String askTo = wife.length() ? wife : admin;
   if (askTo.length() && CurrentHour == FeedbackHr && LastAskDay != today) {
-    TgSendMessage(askTo, "Kaip šiandien tiko apranga pagal mano patarimą? 🙂", true);
+    // Klausime cituojamas rytinis patarimas (kad būtų aišku, KĄ vertinti)
+    String q = "Kaip šiandien tiko apranga pagal mano patarimą? 🙂";
+    if (prefs.getInt("advDay", -1) == today)
+      q = "Ryte siūliau: " + prefs.getString("advEmo", "") + "\n„" + prefs.getString("advTxt", "")
+        + "\"\n\nKaip tiko? Mygtukai žinutės apačioje 🙂";
+    TgSendMessage(askTo, q, true);
     LastAskDay = today; prefs.putInt("lastAsk", today);
   }
 }
@@ -1025,6 +1024,25 @@ ClothingAdvice GetClothingAdvice() {
   else if (windy) { extra = "Vėjas piktas - užsisek!"; }
   if (extra.length()) { if (a.note.length()) a.note += ".  "; a.note += extra; }
   return a;
+}
+
+// Pirmas paros (rytinis) patarimas įsimenamas NVS - vakariniame Telegram klausime
+// cituojama, kas buvo siūlyta (tekstas + drabužių emoji), kad būtų aišku, ką vertinti.
+void SaveDailyAdvice() {
+  int tdy = (int)(time(NULL) / 86400);
+  if (prefs.getInt("advDay", -1) == tdy) return; // šiandien jau įsiminta rytinė versija
+  ClothingAdvice a = GetClothingAdvice();
+  String emo;
+  if (a.tshirt)   emo += "👕";
+  if (a.sweater)  emo += "🧶";
+  if (a.jacket)   emo += "🧥";
+  if (a.hat)      emo += "🧢";
+  if (a.umbrella) emo += "☂️";
+  String full = a.text;
+  if (a.note.length()) full += ". " + a.note;
+  prefs.putInt("advDay", tdy);
+  prefs.putString("advTxt", full);
+  prefs.putString("advEmo", emo);
 }
 
 // Apvalaus stačiakampio pagalbinės (e-ink neturi native rounded-rect)
@@ -1208,7 +1226,7 @@ void DisplayWifeMode() {
   // --- R2: aprangos patarimas (be rėmelio; ikonos kairėje, tekstas fiksuotoje zonoje) ---
   ClothingAdvice adv = GetClothingAdvice();
   int iy = 194, is_ = 48, ix = 60;                                                    // ikonos 194..249
-  #define DRAW2(FN) do { FN(ix, iy, is_); FN(ix + 1, iy + 1, is_); ix += 92; } while (0) // 2x - storesnis kontūras
+  #define DRAW2(FN) do { FN(ix, iy, is_); FN(ix + 1, iy, is_); FN(ix, iy + 1, is_); ix += 92; } while (0) // 3 poslinkiai - tolygus ~2px kontūras, geometrija ta pati
   if (adv.tshirt)   DRAW2(DrawTShirtIcon);
   if (adv.sweater)  DRAW2(DrawSweaterIcon);
   if (adv.jacket)   DRAW2(DrawJacketIcon);

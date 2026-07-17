@@ -7,20 +7,18 @@ Orus gauna iš OpenWeatherMap, atsinaujina kas 30 min., naktį miega ir taip tau
 
 ## 1. Pirmas paleidimas (WiFi nustatymas)
 
-Įjungus įrenginį pirmą kartą (arba paspaudus RESET), jei jis neranda išsaugoto WiFi tinklo:
+Įjungus įrenginį, jei jis neranda išsaugoto WiFi tinklo, ekrane pasirodys
+**„Nepavyko prisijungti prie WiFi"** su užuomina. Portalas automatiškai **neatsidaro** —
+jį įjungiate patys:
 
-1. Ekrane pasirodys užrašas **„WiFi nesukonfigūruotas"** su instrukcijomis.
+1. **Palaikykite mygtuką 3–8 sekundes ir atleiskite** — ekrane pasirodys „Nustatymų režimas".
 2. Telefonu ar kompiuteriu prisijunkite prie WiFi tinklo **`OruStotele-Setup`** (be slaptažodžio).
 3. Naršyklėje atidarykite **`192.168.4.1`** (dažnai atsidaro automatiškai).
 4. Spauskite *Configure WiFi*, pasirinkite savo namų tinklą, įveskite slaptažodį, spauskite *Save*.
-5. Įrenginys prisijungs, parodys orus ir toliau dirbs savarankiškai.
+5. Įrenginys pasileis iš naujo, prisijungs ir toliau dirbs savarankiškai.
 
-Portalas veikia **3 minutes** — jei nespėjote, paspauskite RESET ir bandykite iš naujo.
-
-**Svarbu:** pabudęs iš miego įrenginys portalo neatidaro (kad routerio gedimas nenusėstų
-baterijos) — jis tiesiog bando jungtis ir, nepavykus, miega iki kito karto. Norėdami pakeisti
-WiFi tinklą (pvz., persikrausčius), spauskite **RESET** — jei senas tinklas nepasiekiamas,
-atsidarys konfigūravimo portalas.
+**Jei nieko nedarysite** — įrenginys tyliai bandys jungtis kas 30 min. (pvz., router'is
+laikinai dingo — viskas atsistatys savaime, baterija nesėdinama portalo laukimu).
 
 ## 2. Kasdienis veikimas
 

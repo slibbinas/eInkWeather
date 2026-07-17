@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>eInkWeather — interaktyvus prototipas</title>
+<style>
+:root{
+  --bg:#f7f7f8; --card:#fff; --text:#1d1f24; --muted:#6b7280; --border:#e2e4e9;
+  --accent:#f07a1a; --code-bg:#f0f1f3; --ok:#1a9c46; --bad:#d43a3a;
+  --eink:#ecebe3; --eink-text:#1c1c1a; --eink-muted:#5f5e5a; --eink-line:#8a897f;
+}
+@media (prefers-color-scheme: dark){
+  :root{--bg:#15171c; --card:#1c1f26; --text:#e6e8ec; --muted:#9aa1ad; --border:#2a2e37; --accent:#ff9740; --code-bg:#242830;}
+}
+:root[data-theme="dark"]{--bg:#15171c; --card:#1c1f26; --text:#e6e8ec; --muted:#9aa1ad; --border:#2a2e37; --accent:#ff9740; --code-bg:#242830;}
+:root[data-theme="light"]{--bg:#f7f7f8; --card:#fff; --text:#1d1f24; --muted:#6b7280; --border:#e2e4e9; --accent:#f07a1a; --code-bg:#f0f1f3;}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);padding:16px}
+h1{font-size:20px;margin:0 0 4px}
+.sub{color:var(--muted);font-size:13px;margin:0 0 16px}
+.wrap{display:grid;grid-template-columns:minmax(320px,1.4fr) minmax(280px,1fr);gap:16px;max-width:1240px;margin:0 auto}
+@media (max-width:900px){.wrap{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px}
+.card h2{font-size:14px;margin:0 0 10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+
+/* --- E-ink ekranas --- */
+.device{background:#dcdcd4;border-radius:14px;padding:18px 18px 12px;border:1px solid #b8b7ac}
+.screen{background:var(--eink);color:var(--eink-text);aspect-ratio:960/540;border:2px solid #9a9990;border-radius:4px;
+  position:relative;overflow:hidden;font-family:"Segoe UI",Arial,sans-serif;container-type:inline-size}
+.scr{position:absolute;inset:0;display:none;padding:2.2cqw}
+.scr.on{display:block}
+.eh{font-weight:700}
+.emu{color:var(--eink-muted)}
+.eline{border:0;border-top:1px solid var(--eink-text);margin:1cqw 0}
+.ebar{position:absolute;left:2%;right:2%;bottom:1.5%;border-top:1.5px solid var(--eink-line);padding-top:1cqw;
+  display:flex;gap:3cqw;font-size:2.6cqw;font-weight:600;align-items:center}
+.ebar .batt{margin-left:auto}
+.sleepbadge{position:absolute;top:6px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;padding:2px 8px;border-radius:10px;display:none}
+.screen.sleeping .sleepbadge{display:block}
+.busybadge{position:absolute;top:6px;left:8px;background:var(--accent);color:#fff;font-size:11px;padding:2px 8px;border-radius:10px;display:none}
+.screen.busy .busybadge{display:block}
+/* zmonos rezimas */
+.wgrid{display:grid;grid-template-columns:1.1fr 1.6fr 1.3fr;align-items:start}
+.big{font-size:11cqw;font-weight:700;line-height:1;text-align:center}
+.feels{font-size:2.8cqw;text-align:center;color:var(--eink-muted)}
+.icon-big{font-size:9cqw;text-align:center;line-height:1.2}
+.right-col{font-size:3cqw;font-weight:600;line-height:1.7}
+.advice-row{display:flex;gap:2.5cqw;align-items:center;margin:.6cqw 0}
+.adv-icons{font-size:6.5cqw;letter-spacing:.8cqw;min-width:24cqw}
+.adv-text{font-size:3.4cqw;font-weight:700;line-height:1.35}
+.adv-note{font-size:2.7cqw;color:var(--eink-muted)}
+.meta{font-size:2.4cqw;color:var(--eink-muted)}
+.concl{font-size:2.8cqw;font-weight:600}
+.days{display:grid;grid-template-columns:1fr 1fr 1fr;text-align:center;margin-top:1cqw}
+.days>div{border-right:1px solid #c8c7bc;padding:0 1cqw}
+.days>div:last-child{border-right:0}
+.dlabel{font-size:3cqw;font-weight:700}
+.dtemp{font-size:4.2cqw;font-weight:700}
+.dicon{font-size:4cqw}
+/* pilnas rezimas - schema */
+.fgrid{display:grid;grid-template-columns:1fr 1.6fr 1fr;gap:1cqw;font-size:2.8cqw}
+.rose{width:16cqw;height:16cqw;border:2px solid var(--eink-text);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:3.4cqw;margin:1cqw auto}
+.graphs{display:grid;grid-template-columns:repeat(4,1fr);gap:1.5cqw;margin-top:2cqw}
+.graphs>div{border:1px solid var(--eink-line);height:12cqw;font-size:2.2cqw;text-align:center;padding-top:.5cqw;color:var(--eink-muted)}
+/* techniniai ekranai */
+.center{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;gap:1.6cqw}
+.t1{font-size:4.6cqw;font-weight:700}
+.t2{font-size:3cqw}
+.code{font-family:ui-monospace,Consolas,monospace;background:rgba(0,0,0,.06);padding:.3cqw 1cqw;border-radius:4px}
+.pbar{width:64%;height:4.5cqw;border:2px solid var(--eink-text);border-radius:2px;overflow:hidden}
+.pfill{height:100%;width:0;background:var(--eink-text);transition:width .25s}
+
+/* --- Mygtukai --- */
+.btns{display:grid;gap:8px;margin-top:12px}
+.btn{display:flex;align-items:center;gap:10px;border:1px solid var(--border);background:var(--card);color:var(--text);
+  border-radius:10px;padding:10px 12px;font-size:14px;cursor:pointer;text-align:left;min-height:44px}
+.btn:hover{border-color:var(--accent)}
+.btn b{color:var(--accent)}
+.btn small{color:var(--muted);display:block}
+.btn.reset b{color:var(--bad)}
+.hint{font-size:12px;color:var(--muted);margin-top:8px}
+
+/* --- Telegram --- */
+.chat{display:flex;flex-direction:column;height:520px}
+.msgs{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px}
+.msg{max-width:85%;padding:8px 12px;border-radius:12px;font-size:13.5px;line-height:1.45;white-space:pre-wrap}
+.msg.bot{background:var(--code-bg);border:1px solid var(--border);align-self:flex-start;border-bottom-left-radius:4px}
+.msg.user{background:var(--accent);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+.msg.note{background:none;border:1px dashed var(--border);color:var(--muted);align-self:center;font-size:12px}
+.kb{display:none;grid-template-columns:1fr 1fr;gap:6px;padding:8px 4px 2px;border-top:1px solid var(--border);margin-top:6px}
+.kb.on{display:grid}
+.kb button{border:1px solid var(--border);background:var(--code-bg);color:var(--text);border-radius:8px;padding:9px 6px;font-size:13px;cursor:pointer}
+.kb button:hover{border-color:var(--accent)}
+.chat-tools{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.chat-tools button{border:1px solid var(--border);background:none;color:var(--muted);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer}
+.chat-tools button:hover{color:var(--accent);border-color:var(--accent)}
+</style>
+</head>
+<body>
+<h1>eInkWeather — interaktyvus prototipas</h1>
+<p class="sub">Įrenginio ekrano, fizinio mygtuko pakopų ir Telegram grandinės simuliacija. Spauskite mygtukus po ekranu — jie atitinka VIENĄ fizinį mygtuką, laikomą skirtingą laiką.</p>
+
+<div class="wrap">
+  <div class="card">
+    <h2>Įrenginys (LilyGo EPD47, 960×540)</h2>
+    <div class="device">
+      <div class="screen" id="screen">
+        <span class="sleepbadge">💤 miega — mygtukas pažadins</span>
+        <span class="busybadge">⏳ dirba (~30 s) — paspaudimai ignoruojami</span>
+
+        <!-- ŽMONOS REŽIMAS -->
+        <div class="scr" id="scr-wife">
+          <div class="wgrid">
+            <div class="icon-big">⛅</div>
+            <div>
+              <div class="feels">jaučiasi kaip</div>
+              <div class="big">17°</div>
+              <div class="feels">termometras rodo 17°</div>
+            </div>
+            <div class="right-col">▲ 24°<br>▼ 16°<br><span class="emu">3 m/s ŠV<br>lietus 0%</span></div>
+          </div>
+          <hr class="eline">
+          <div class="advice-row">
+            <div class="adv-icons">👕🧶</div>
+            <div>
+              <div class="meta">KAIP RENGTIS</div>
+              <div class="adv-text">Megztinio diena: nei šalta, nei karšta — kaip tik</div>
+              <div class="adv-note">Po pietų iki 24° — renkis sluoksniais</div>
+            </div>
+          </div>
+          <hr class="eline">
+          <div class="meta">Korekcija −2.0°&nbsp;&nbsp;&nbsp;klausta: 07-17&nbsp;&nbsp;&nbsp;atsakyta: <span id="fbdate">−</span>&nbsp;&nbsp;&nbsp;kitas: rytoj 20:00</div>
+          <div class="concl" id="concl">Renkuosi patarimus, reikia daugiau atsiliepimų</div>
+          <div class="days">
+            <div><div class="dlabel">Rytas</div><div><span class="dicon">🌤</span> <span class="dtemp">18°</span></div></div>
+            <div><div class="dlabel">Diena</div><div><span class="dicon">☀️</span> <span class="dtemp">23°</span></div></div>
+            <div><div class="dlabel">Vakaras</div><div><span class="dicon">⛅</span> <span class="dtemp">24°</span></div></div>
+          </div>
+          <div class="ebar"><span class="eh">Vilnius</span><span>Penktadienis, 17-07-2026 @ 08:31</span><span class="batt">🔋 89% 4.09v&nbsp;&nbsp;📶</span></div>
+        </div>
+
+        <!-- PILNAS REŽIMAS -->
+        <div class="scr" id="scr-full">
+          <div class="fgrid">
+            <div><div class="rose">0.9<br>m/s</div><div class="emu" style="text-align:center">05:04 Saulėtekis<br>21:45 Saulėlydis 🌒</div></div>
+            <div><span class="eh" style="font-size:5cqw">20.8° &nbsp; 76%</span><br>21° | 21° &nbsp; Debesuota<br><span class="emu">764 mmHg &nbsp; 👁 10 km &nbsp; ☁ 92%</span>
+              <div class="emu" style="margin-top:1.5cqw">12:00 ⛅ 15:00 ⛅ 18:00 ⛅ 21:00 ☁ 00:00 ☁ 03:00 🌙</div></div>
+            <div style="text-align:center;font-size:9cqw">⛅</div>
+          </div>
+          <div class="graphs"><div>Slėgis (mmHg)<br>📈</div><div>Temperatūra (°C)<br>📈</div><div>Lietus (mm)<br>📊</div><div>Drėgnumas (%)<br>📈</div></div>
+          <div class="ebar"><span class="eh">Vilnius</span><span>Penktadienis, 17-07-2026 @ 08:31</span><span class="batt">🔋 89% 4.09v&nbsp;&nbsp;📶</span></div>
+        </div>
+
+        <!-- NUSTATYMŲ PORTALAS -->
+        <div class="scr" id="scr-portal"><div class="center">
+          <div class="t1">Nustatymų režimas</div>
+          <div class="t2">1. Telefonu prisijunkite prie WiFi tinklo: <b>OruStotele-Setup</b></div>
+          <div class="t2">2. Naršyklėje atidarykite: <span class="code">192.168.4.1</span></div>
+          <div class="t2">3. „Setup" — API raktas, miestas, valandos, Telegram · „Configure WiFi" — tinklas</div>
+          <div class="t2 emu">Portalas veiks 5 minutes, po to įrenginys pasileis iš naujo</div>
+        </div></div>
+
+        <!-- OTA -->
+        <div class="scr" id="scr-ota"><div class="center">
+          <div class="t1">OTA įkėlimo režimas</div>
+          <div class="t2">Laukiu programos per WiFi (5 min.)</div>
+          <div class="t2">Kompiuteryje: <span class="code">pio run -e ota -t upload</span></div>
+          <div class="t2">Adresas: <span class="code">192.168.1.105</span> (orustotele.local)</div>
+          <div class="pbar"><div class="pfill" id="pfill"></div></div>
+          <div class="t2 emu" id="ota-status">Mygtukas dar kartą — Telegram testas</div>
+        </div></div>
+
+        <!-- TELEGRAM TESTAS -->
+        <div class="scr" id="scr-tgtest"><div class="center">
+          <div class="t1">Telegram testas</div>
+          <div class="t2" id="tgtest-line1">Klausimas išsiųstas adminui</div>
+          <div class="t2">Paspauskite atsakymo mygtuką telefone (dešinėje →)</div>
+          <div class="t2 emu" id="tgtest-status">Laukiu atsakymo iki 90 s...</div>
+        </div></div>
+
+        <!-- WIFI NEPAVYKO -->
+        <div class="scr" id="scr-wififail"><div class="center">
+          <div class="t1">Nepavyko prisijungti prie WiFi</div>
+          <div class="t2">WiFi nustatymui palaikykite mygtuką 3–8 sek.</div>
+          <div class="t2 emu">Kitaip bandysiu jungtis vėl kas 30 min.</div>
+        </div></div>
+      </div>
+
+      <div class="btns">
+        <button class="btn" onclick="pressShort()">⚪ <span><b>Trumpas paspaudimas</b> (&lt;3 s) — perjungti pilną ⇄ žmonos režimą<small>OTA lange: paleisti Telegram testą</small></span></button>
+        <button class="btn" onclick="pressMedium()">🕒 <span><b>Ilgas 3–8 s</b> — WiFi / nustatymų portalas<small>API raktas, miestas, valandos, Telegram token, tinklo keitimas</small></span></button>
+        <button class="btn" onclick="pressLong()">⏳ <span><b>Labai ilgas ≥8 s</b> — OTA įkėlimo režimas<small>firmware per WiFi su progreso juosta ekrane</small></span></button>
+        <button class="btn reset" onclick="pressReset()">🔁 <span><b>RESET</b> — perkrauti<small>priverstinis orų atnaujinimas bet kuriuo paros metu</small></span></button>
+      </div>
+      <div class="hint" id="hint">Įrenginys miega. Visos mygtuko pakopos matuojamos nuo paspaudimo iki atleidimo.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Telegram — orų stotelės botas 🌤</h2>
+    <div class="chat">
+      <div class="msgs" id="msgs"></div>
+      <div class="kb" id="kb">
+        <button onclick="reply('FB_COLD')">🥶 Buvo šalta</button>
+        <button onclick="reply('FB_OK')">👍 Kaip tik</button>
+        <button onclick="reply('FB_HOT')">🥵 Buvo karšta</button>
+        <button onclick="reply('FB_SKIP')">🤷 Nesilaikiau</button>
+      </div>
+      <div class="chat-tools">
+        <button onclick="simEvening()">⏰ Simuliuoti vakarinį klausimą (20:00)</button>
+        <button onclick="simBattery()">🪫 Simuliuoti baterijos perspėjimą</button>
+        <button onclick="cmdStatus()">/status</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const S = { mode:'wife', state:'sleep', otaTimer:null };
+const $ = id => document.getElementById(id);
+const screen = $('screen');
+const FB = {FB_COLD:'buvo šalta 🥶', FB_OK:'kaip tik 👍', FB_HOT:'buvo karšta 🥵', FB_SKIP:'nesilaikė patarimo 🤷'};
+const FBREPLY = {FB_COLD:'Užrašiau! 🧣 Nuo šiol renku šilčiau.', FB_OK:'Puiku, vadinasi pataikėm! 🎯',
+                 FB_HOT:'Supratau! 😎 Kitąkart siūlysiu lengviau.', FB_SKIP:'Aišku, užskaičiau, kad nesilaikėte 🙂'};
+let awaiting = null; // 'evening' | 'tgtest'
+
+function show(id){ document.querySelectorAll('.scr').forEach(e=>e.classList.remove('on')); $(id).classList.add('on'); }
+function setHint(t){ $('hint').textContent = t; }
+function sleep(){ S.state='sleep'; screen.classList.add('sleeping'); screen.classList.remove('busy'); }
+function busy(t, done, ms=1800){ S.state='busy'; screen.classList.remove('sleeping'); screen.classList.add('busy');
+  setHint(t); setTimeout(()=>{ done(); sleep(); }, ms); }
+
+function msg(cls, text){ const d=document.createElement('div'); d.className='msg '+cls; d.textContent=text;
+  $('msgs').appendChild(d); $('msgs').scrollTop=1e9; }
+function kb(on){ $('kb').classList.toggle('on', on); }
+
+/* --- Mygtuko pakopos --- */
+function pressShort(){
+  if (S.state==='ota'){ startTgTest(); return; }
+  if (S.state==='busy'){ setHint('⏳ Įrenginys dar dirba — paspaudimas ignoruojamas (spausti kai miega).'); return; }
+  busy('Pabudo: jungiasi prie WiFi, siunčiasi orus, perpiešia (~30 s)...', ()=>{
+    S.mode = S.mode==='wife' ? 'full' : 'wife';
+    show(S.mode==='wife' ? 'scr-wife' : 'scr-full');
+    setHint('Režimas perjungtas ir įsimintas (išlieka po perkrovimo). Vėl miega.');
+  });
+}
+function pressMedium(){
+  if (S.state==='busy') return;
+  show('scr-portal'); screen.classList.remove('sleeping'); S.state='portal';
+  setHint('Portalas veikia 5 min. Telefonu: OruStotele-Setup → 192.168.4.1. Po išsaugojimo — restartas.');
+  setTimeout(()=>{ if(S.state==='portal'){ show(S.mode==='wife'?'scr-wife':'scr-full'); sleep(); setHint('Portalas užsidarė, įrenginys grįžo į darbą.'); } }, 12000);
+}
+function pressLong(){
+  if (S.state==='busy') return;
+  show('scr-ota'); screen.classList.remove('sleeping'); S.state='ota';
+  $('pfill').style.width='0'; $('ota-status').textContent='Mygtukas dar kartą — Telegram testas';
+  setHint('OTA režimas 5 min. Kompiuteryje: pio run -e ota -t upload. (Prototipe įkėlimas startuos pats po 3 s.)');
+  clearTimeout(S.otaTimer);
+  S.otaTimer = setTimeout(simOtaUpload, 3000);
+}
+function simOtaUpload(){
+  if (S.state!=='ota') return;
+  let p=0; $('ota-status').textContent='Įkeliama...';
+  const iv=setInterval(()=>{ if(S.state!=='ota'){clearInterval(iv);return;}
+    p+=4; $('pfill').style.width=Math.min(p,100)+'%';
+    if(p>=100){ clearInterval(iv); $('ota-status').textContent='Įkelta! Perkraunama...';
+      setTimeout(()=>{ pressReset(); }, 1500); }
+  }, 120);
+}
+function pressReset(){
+  clearTimeout(S.otaTimer); awaiting = awaiting==='tgtest' ? null : awaiting; kb(awaiting!==null);
+  busy('Perkrauta: priverstinis atnaujinimas (veikia net naktį)...', ()=>{
+    show(S.mode==='wife'?'scr-wife':'scr-full');
+    setHint('Atnaujinta. Miega iki kito ciklo (30 min.) arba mygtuko.');
+  });
+}
+
+/* --- Telegram --- */
+function startTgTest(){
+  S.state='tgtest'; show('scr-tgtest'); awaiting='tgtest'; kb(true);
+  msg('bot','🔧 TESTAS: paspauskite mygtuką žinutės APAČIOJE, prie teksto lauko (jei nesimato — klaviatūros ikona ⌨)');
+  setHint('Testas: paspauskite atsakymo mygtuką Telegram lange (dešinėje). Laukia 90 s.');
+}
+function simEvening(){
+  awaiting='evening'; kb(true);
+  msg('bot','Ryte siūliau: 👕🧶\n„Megztinio diena: nei šalta, nei karšta — kaip tik. Po pietų iki 24° — renkis sluoksniais"\n\nKaip tiko? Mygtukai žinutės apačioje 🙂');
+}
+function reply(code){
+  if(!awaiting) return;
+  msg('user', $('kb').querySelector(`[onclick="reply('${code}')"]`).textContent);
+  kb(false);
+  if (awaiting==='tgtest'){
+    msg('bot','Testas pavyko ✅ Ryšys veikia! (į statistiką neįskaičiuota)');
+    $('tgtest-status').textContent='Veikia! Gauta: '+FB[code];
+    setHint('Testas pavyko — ekrane „Veikia! Gauta: '+FB[code]+'". Perkraunama...');
+    awaiting=null; setTimeout(pressReset, 2200);
+    return;
+  }
+  msg('bot', FBREPLY[code]);
+  msg('note','→ adminui: 👗 Žmona atsakė: '+FB[code]);
+  $('fbdate').textContent='07-17';
+  if(code==='FB_COLD') $('concl').textContent='Dažniau jaučiate šaltį — renku šilčiau 🧣';
+  if(code==='FB_HOT')  $('concl').textContent='Mėgstate lengviau — renku vėsiau 😎';
+  if(code==='FB_OK')   $('concl').textContent='Patarimai gerai pritaikyti 🎯';
+  if(code==='FB_SKIP') $('concl').textContent='Dažnai nesilaikote patarimų 🙂';
+  awaiting=null;
+  setHint('Atsakymas užskaitytas: koeficientas ir ekrano „atsakyta"/išvada atsinaujino (realiai — per ~30 min.).');
+}
+function simBattery(){ msg('bot','🪫 Baterija liko 9% (3.42 V) - laikas pakrauti!'); msg('note','(siunčiama tik adminui, kartą per dieną)'); }
+function cmdStatus(){ msg('user','/status');
+  msg('bot','📟 Orų stotelė v2.5\n🕐 Penktadienis 08:31\n📍 Vilnius\n🌡 20.8°C (jaučiasi 21.0°)\n💧 76%   764 mmHg\n💨 0.9 m/s P\n🔋 89% (4.09 V)   📶 -61 dBm\n🧥 Korekcija -2.0°C — renkuosi patarimus\n🗳 Atsiliepimai: šalta 0 / gerai 0 / karšta 0 / nesilaikyta 0\n🖥 Režimas: žmonos   🧠 180 KB'); }
+
+/* startas */
+show('scr-wife'); sleep();
+msg('note','Prototipas: kairėje įrenginys, čia — Telegram pokalbis. Pradėkite nuo „⏰ Simuliuoti vakarinį klausimą".');
+</script>
+</body>
+</html>
