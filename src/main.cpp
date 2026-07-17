@@ -42,7 +42,7 @@
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
-#define FW_VERSION 8             // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
+#define FW_VERSION 9             // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -1342,11 +1342,12 @@ void drawRoundRect(int x, int y, int w, int h, int r) {
   drawArcCorner(x + r,     y + h - r, r, 0.5 * PI, PI);       // a. kairė
 }
 
-// Nespalvoto bitmapo (clothing_icons.h, 1bpp, bitas=1 => juoda) piešimas viršutiniu kairiu kampu (x,y)
-void DrawIcon(int x, int y, const uint8_t* bmp) {
-  for (int row = 0; row < ICON_H; row++)
-    for (int col = 0; col < ICON_W; col++)
-      if (bmp[row * ICON_BPR + (col >> 3)] & (0x80 >> (col & 7)))
+// Nespalvoto bitmapo (clothing_icons.h, 1bpp, bitas=1 => juoda) piešimas viršutiniu kairiu kampu (x,y), dydis w x h
+void DrawIcon(int x, int y, const uint8_t* bmp, int w, int h) {
+  int bpr = (w + 7) / 8;
+  for (int row = 0; row < h; row++)
+    for (int col = 0; col < w; col++)
+      if (bmp[row * bpr + (col >> 3)] & (0x80 >> (col & 7)))
         drawPixel(x + col, y + row, Black);
 }
 
@@ -1532,8 +1533,11 @@ void DisplayWifeMode() {
 
   // --- R2: aprangos patarimas (be rėmelio; ikonos kairėje, tekstas fiksuotoje zonoje) ---
   ClothingAdvice adv = GetClothingAdvice();
-  int iy = 192, ix = 24;                                                              // bitmapai 104x104; 3mm iki linijų (juosta 164..324: top=192, apačia=296)
-  for (int i = 0; i < adv.n; i++) { DrawIcon(ix, iy, adv.icons[i]); ix += 108; }      // iki 3 ikonų: x 24,132,240 (dešinys kraštas 344 < tx=350)
+  // Adaptyvu: pagrindinis drabužis DIDELIS (icons[0], 124px), aksesuarai maži (icons[1..], 72px)
+  int gy = 164 + (160 - ICON_G_H) / 2;                                               // drabužis vertikaliai centruotas juostoje 164..324 (y182)
+  DrawIcon(24, gy, adv.icons[0], ICON_G_W, ICON_G_H);                                // x24..148
+  int ay = 164 + (160 - ICON_A_H) / 2, ax = 24 + ICON_G_W + 12;                      // aksesuarai: y208, pradžia x160
+  for (int i = 1; i < adv.n; i++) { DrawIcon(ax, ay, adv.icons[i], ICON_A_W, ICON_A_H); ax += ICON_A_W + 8; } // x160,240 (<tx=350)
   const int tx = 350, tw = 590;                                                       // teksto zona x 350..940
   setFont(&OpenSans8B);
   drawStringTop(tx, 168, "KAIP RENGTIS", LEFT);                                       // 168..188
