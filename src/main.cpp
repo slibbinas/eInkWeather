@@ -41,7 +41,7 @@
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
-#define FW_VERSION 3             // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
+#define FW_VERSION 4             // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -357,17 +357,19 @@ void StartOtaMode() {
     }
   });
   ArduinoOTA.onEnd([]() {
-    fillRect(0, 396, SCREEN_WIDTH, 144, White);            // nuvalom užuominą buferyje - kitaip tekstai užliptų
-    fillRect(OTA_BAR_X, OTA_BAR_Y, OTA_BAR_W, OTA_BAR_H, Black); // pilna juosta ir buferyje (pilnas refresh jos neištrintų)
+    // Pilnas ekrano išvalymas (ne baltas fillRect!) - po dalinių epd_push_pixels fiziniai
+    // pikseliai lieka, tad baltas piešimas jų neištrina ir tekstai užlipdavo. ClearScreen
+    // (epd_clear+memset) nuvalo ir fiziškai, ir buferį -> švarus „Perkraunama" langas.
+    ClearScreen();
     setFont(&OpenSans18B);
-    drawStringTop(SCREEN_WIDTH / 2, 420, "Įkelta! Perkraunama...", CENTER);
+    drawStringTop(SCREEN_WIDTH / 2, 240, "Įkelta! Perkraunama...", CENTER);
     edp_update();
     epd_poweroff_all();                        // po šio callback'o ArduinoOTA pats perkrauna
   });
   ArduinoOTA.onError([](ota_error_t e) {
-    fillRect(0, 396, SCREEN_WIDTH, 144, White);
+    ClearScreen();
     setFont(&OpenSans18B);
-    drawStringTop(SCREEN_WIDTH / 2, 420, "OTA klaida " + String((int)e) + " - perkraunama", CENTER);
+    drawStringTop(SCREEN_WIDTH / 2, 240, "OTA klaida " + String((int)e) + " - perkraunama", CENTER);
     edp_update();
     epd_poweroff_all();
     delay(2000);
