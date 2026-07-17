@@ -333,6 +333,7 @@ void StartOtaMode() {
   drawStringTop(SCREEN_WIDTH / 2, 160, "Laukiu programos per WiFi (5 min.)", CENTER);
   drawStringTop(SCREEN_WIDTH / 2, 200, "Kompiuteryje: pio run -e ota -t upload", CENTER);
   drawStringTop(SCREEN_WIDTH / 2, 240, "Adresas: " + WiFi.localIP().toString() + "  (orustotele.local)", CENTER);
+  drawStringTop(SCREEN_WIDTH / 2, 430, "Mygtukas dar kartą - Telegram testas", CENTER);
   drawRect(OTA_BAR_X - 3, OTA_BAR_Y - 3, OTA_BAR_W + 6, OTA_BAR_H + 6, Black); // juostos rėmelis
   drawRect(OTA_BAR_X - 2, OTA_BAR_Y - 2, OTA_BAR_W + 4, OTA_BAR_H + 4, Black);
   edp_update();                                // ekranas lieka įjungtas progreso piešimui
@@ -362,9 +363,15 @@ void StartOtaMode() {
     ESP.restart();
   });
   ArduinoOTA.begin();
+  pinMode(BUTTON_1, INPUT_PULLUP);
+  while (digitalRead(BUTTON_1) == LOW) delay(50); // palaukti, kol atleis 8 s laikytą mygtuką
   unsigned long start = millis();
   while (millis() - start < 5UL * 60UL * 1000UL) { // 5 min langas
     ArduinoOTA.handle();
+    if (digitalRead(BUTTON_1) == LOW) {            // dar vienas paspaudimas -> Telegram testas
+      delay(50);
+      if (digitalRead(BUTTON_1) == LOW) TelegramTestMode(); // baigiasi restart
+    }
     delay(10);
   }
   epd_poweroff_all();                          // niekas neatsiuntė - grįžtam į įprastą darbą
@@ -859,6 +866,65 @@ void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
     TgSendMessage(askTo, "Kaip šiandien tiko apranga pagal mano patarimą? 🙂", true);
     LastAskDay = today; prefs.putInt("lastAsk", today);
   }
+}
+
+// Telegram testas iš OTA lango: išsiunčia testinį klausimą ir 90 s gyvai (be miego) laukia
+// atsakymo - visa grandinė matoma realiu laiku. Į ChillBias statistiką NEskaičiuojama.
+void TelegramTestMode() {
+  epd_clear();
+  setFont(&OpenSans18B);
+  drawStringTop(SCREEN_WIDTH / 2, 60, "Telegram testas", CENTER);
+  setFont(&OpenSans12B);
+  String admin = prefs.getString("chatAdmin", prefs.getString("chatId", String(telegramChatID)));
+  String wife  = prefs.getString("chatWife", "");
+  String askTo = wife.length() ? wife : admin;
+  if (TgToken.length() == 0 || askTo.length() == 0) {
+    drawStringTop(SCREEN_WIDTH / 2, 160, TgToken.length() == 0
+        ? "Boto token nenustatytas (ilgas paspaudimas - Setup)"
+        : "Nėra registruotų gavėjų - parašykite botui žinutę", CENTER);
+    edp_update();
+    delay(5000);
+    epd_poweroff_all();
+    ESP.restart();
+  }
+  long offset = prefs.getLong("tgOffset", 0);
+  TgSendMessage(askTo, "🔧 TESTAS: paspauskite bet kurį mygtuką žemiau", true);
+  drawStringTop(SCREEN_WIDTH / 2, 150, String("Klausimas išsiųstas ") + (wife.length() ? "žmonai" : "adminui"), CENTER);
+  drawStringTop(SCREEN_WIDTH / 2, 190, "Paspauskite atsakymo mygtuką telefone", CENTER);
+  drawStringTop(SCREEN_WIDTH / 2, 230, "Laukiu atsakymo iki 90 s...", CENTER);
+  edp_update();
+  unsigned long start = millis();
+  String got = "";
+  while (millis() - start < 90000 && got.length() == 0) {
+    delay(3000);                                   // tikrinam kas 3 s - gyvai, be miego ciklo
+    String resp = TgApiCall("getUpdates?offset=" + String(offset) + "&limit=3&timeout=0", "");
+    if (resp.length() == 0) continue;
+    DynamicJsonDocument doc(32 * 1024);
+    if (deserializeJson(doc, resp) != DeserializationError::Ok || doc["ok"] != true) continue;
+    for (JsonObject upd : doc["result"].as<JsonArray>()) {
+      long updId = upd["update_id"].as<long>();
+      if (updId >= offset) { offset = updId + 1; prefs.putLong("tgOffset", offset); }
+      if (upd.containsKey("message")) {
+        String cid; serializeJson(upd["message"]["chat"]["id"], cid);
+        String text = upd["message"]["text"] | "";
+        String fb = FbCodeFromText(text);
+        if (fb.length()) {                         // testo atsakymas - patvirtinam, bet neskaičiuojam
+          got = FbLabel(fb);
+          TgSendMessage(cid, "Testas pavyko ✅ Ryšys veikia! (į statistiką neįskaičiuota)", false);
+          break;
+        }
+      }
+    }
+  }
+  epd_clear();
+  setFont(&OpenSans18B);
+  drawStringTop(SCREEN_WIDTH / 2, 200, got.length() ? ("Veikia! Gauta: " + got) : "Atsakymo negauta per 90 s", CENTER);
+  setFont(&OpenSans12B);
+  drawStringTop(SCREEN_WIDTH / 2, 270, "Perkraunama...", CENTER);
+  edp_update();
+  epd_poweroff_all();
+  delay(3000);
+  ESP.restart();
 }
 
 //################ PAPRASTASIS ("ŽMONOS") REŽIMAS ########################################
