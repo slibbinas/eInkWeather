@@ -35,8 +35,13 @@ mygtukas, ne RESET):
 
 - **Pilnas** — visa informacija su grafikais (aprašyta žemiau).
 - **Paprastasis** — **jutiminė** temperatūra dideliu skaičiumi („jaučiasi kaip"), termometro
-  rodmuo mažesniu, šmaikštus patarimas, kaip šiandien rengtis (su drabužių piktogramomis:
-  maikutė, megztinis, striukė, kepurė, skėtis), ir dienos eiga: rytas / diena / vakaras.
+  rodmuo mažesniu, šmaikštus patarimas, kaip šiandien rengtis, ir dienos eiga:
+  rytas / diena / vakaras.
+
+  Prie patarimo rodomos **drabužių piktogramos** (iki 3 vienu metu): **maikutė** (šilta, ≥15°),
+  **megztinis** su mezgimo raštu (8–22°), **striukė** su apykakle ir užtrauktuku (<15°),
+  **kepurė** su bumbulu (<8° arba sninga), **skėtis** (tik kai lyja ar tikimybė ≥35 %).
+  Žiemos smulkmenos — pirštinės, šalikas, neperšlampami batai — primenamos patarimo tekste.
 
 > Didelis skaičius rodo, kaip oras **jaučiasi** (su vėju ir drėgme), o ne teorinį termometro
 > rodmenį — būtent tai svarbu renkantis, kaip rengtis.

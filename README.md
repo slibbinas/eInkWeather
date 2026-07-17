@@ -50,8 +50,19 @@ Papildomi **modifikatoriai** (pridedami prie patarimo):
 - **Sniegas** → „batai neperšlampami" ir pridedama **kepurė**.
 - **Stiprus vėjas** (≥ 8 m/s, kai nelyja ir nesninga) → „Vėjas piktas – užsisek iki kaklo".
 
-Skėtis rodomas tik kai reikia; kitu atveju nerodomas (teksto vieta fiksuota, todėl išdėstymas
-nešokinėja).
+**Galimos piktogramos ekrane** (piešiamos vektoriais, identiškos [maketui](docs/mockup_zmonos.svg);
+vienu metu rodomos iki 3):
+
+| Piktograma | Kada rodoma |
+|---|---|
+| 👕 maikutė | šilta (≥ 15 °C) |
+| 👚 megztinis (su mezgimo raštu) | vidutiniškai (8–22 °C) |
+| 🧥 striukė (apykaklė + užtrauktukas) | vėsu / šalta (< 15 °C) |
+| 🧢 kepurė su bumbulu | šalta (< 8 °C) arba sninga |
+| ☂️ skėtis | tik kai lyja arba tikimybė ≥ 35 % |
+
+Skėtis rodomas tik kai reikia; teksto vieta fiksuota, todėl išdėstymas nešokinėja. Žiemos
+subtilybės (pirštinės, šalikas, neperšlampami batai) primenamos patarimo tekste.
 
 ## Savaime besimokantys patarimai (Telegram)
 

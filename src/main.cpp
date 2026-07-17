@@ -1227,7 +1227,9 @@ static float gF; static int gOX, gOY;                 // aktyvios ikonos masteli
 static void gMap(float x, float y, int &px, int &py) { px = gOX + lroundf(x * gF); py = gOY + lroundf(y * gF); }
 static void gSeg(float x0, float y0, float x1, float y1) {
   int ax, ay, bx, by; gMap(x0, y0, ax, ay); gMap(x1, y1, bx, by);
-  drawLine(ax, ay, bx, by, Black); drawLine(ax + 1, ay, bx + 1, by, Black); drawLine(ax, ay + 1, bx, by + 1, Black);
+  for (int di = -1; di <= 2; di++)            // 4x4 poslinkių tinklelis - ~4px storio kontūras
+    for (int dj = -1; dj <= 2; dj++)
+      drawLine(ax + di, ay + dj, bx + di, by + dj, Black);
 }
 static void gQuad(float x0, float y0, float cx, float cy, float x1, float y1) { // kvadratinis Bezier 8 atkarpomis
   float px = x0, py = y0;
@@ -1271,9 +1273,11 @@ void DrawJacketIcon(int x, int y, int s) {
 void DrawHatIcon(int x, int y, int s) {
   int r = s / 2;
   int cy = y + r + s / 8;
-  for (float ang = PI; ang <= 2 * PI; ang += 0.02) { // kupolas
-    drawPixel(x + r * cos(ang), cy + r * sin(ang), Black);
-    drawPixel(x + r * cos(ang), cy + r * sin(ang) + 1, Black);
+  for (float ang = PI; ang <= 2 * PI; ang += 0.02) { // kupolas (~4px storio, kaip kitos ikonos)
+    int px = x + r * cos(ang), py = cy + r * sin(ang);
+    for (int di = -1; di <= 2; di++)
+      for (int dj = -1; dj <= 2; dj++)
+        drawPixel(px + di, py + dj, Black);
   }
   fillRect(x - r - s / 10, cy - s / 14, 2 * r + s / 5, s / 7, Black); // atvartas
   fillCircle(x, cy - r - s / 10, s / 10, Black);                     // bumbulas
@@ -1390,7 +1394,7 @@ void DisplayWifeMode() {
 
   // --- R2: aprangos patarimas (be rėmelio; ikonos kairėje, tekstas fiksuotoje zonoje) ---
   ClothingAdvice adv = GetClothingAdvice();
-  int iy = 190, is_ = 68, ix = 66;                                                    // ikonos 190..258; daugiausiai 3 vnt., telpa iki tx=350
+  int iy = 188, is_ = 75, ix = 68;                                                    // ikonos 188..262; daugiausiai 3 vnt., telpa iki tx=350
   if (adv.tshirt)   { DrawTShirtIcon(ix, iy, is_);   ix += 100; }
   if (adv.sweater)  { DrawSweaterIcon(ix, iy, is_);  ix += 100; }
   if (adv.jacket)   { DrawJacketIcon(ix, iy, is_);   ix += 100; }
