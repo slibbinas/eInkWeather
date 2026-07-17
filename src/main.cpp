@@ -34,14 +34,15 @@
 #include "owm_credentials.h"
 #include "forecast_record.h"
 #include "lang_lt.h"            //Using Lithuanian translation
-#include "functions.h"          // All the functions used in this program are in this file, to keep the main code tidy and easy to read 
+#include "functions.h"          // All the functions used in this program are in this file, to keep the main code tidy and easy to read
+#include "clothing_icons.h"     // Autogeneruoti drabužių bitmapai (72x72, 1bpp) - svg2icon pipeline
 
 #define SCREEN_WIDTH   EPD_WIDTH
 #define SCREEN_HEIGHT  EPD_HEIGHT
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
-#define FW_VERSION 5             // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
+#define FW_VERSION 6             // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -1240,74 +1241,69 @@ void SelfUpdateCheck(bool force) {
 // Perjungiamas plokštės mygtuku (GPIO21). Be grafikų: temperatūra, jutiminė temperatūra,
 // šmaikštus patarimas kaip rengtis ir dienos eiga (rytas/diena/vakaras).
 
+// Aprangos patarimas: 7 temperatūros juostos (po VIENĄ pagrindinį drabužį) + modifikatoriai
+// (vėjas->šalikas, lietus->skėtis, smarkus lietus->drabužis su kapišonu). Ribos derintos su
+// vartotoju 2026-07-18 (žr. memory eink-apsirengimo-stiliai). Ikonos - bitmapai (clothing_icons.h).
 struct ClothingAdvice {
-  String text;   // bazinis patarimas - rodomas dideliu šriftu (18B)
-  String note;   // dienos pokytis / krituliai / vėjas - mažesniu (12B), hierarchija dydžiu
-  bool tshirt, sweater, jacket, hat, umbrella;
+  String text;                 // bazinis patarimas - didelis šriftas (18B)
+  String note;                 // dienos pokytis / krituliai / vėjas - mažesnis (12B)
+  const uint8_t* icons[4];     // drabužių bitmapų rodyklės (pagrindinis + modifikatoriai)
+  const char*    emos[4];      // atitinkami emoji - vakariniam Telegram klausimui
+  int n;
 };
 
+static void addCloth(ClothingAdvice &a, const uint8_t* ic, const char* em) {
+  if (a.n < 4) { a.icons[a.n] = ic; a.emos[a.n] = em; a.n++; }
+}
+
 ClothingAdvice GetClothingAdvice() {
-  ClothingAdvice a = {"", "", false, false, false, false, false};
-  float feels = WxConditions[0].Feelslike + ChillBias; // šalčmyrės korekcija: mokosi iš Telegram atsakymų
-  // Dienos jutiminės temperatūros diapazonas (artimiausios dienos valandos) - kad patarimas
-  // atspindėtų ne tik dabar, bet ir kaip keisis oras dienos bėgyje
-  float feelsMax = feels, feelsMin = feels;
-  for (int r = 0; r < 8; r++) {                         // ~24 val. į priekį (3 val. žingsnis)
-    time_t ft = WxForecast[r].Dt;
-    struct tm *flt = localtime(&ft);
+  ClothingAdvice a; a.n = 0; a.text = ""; a.note = "";
+  float feels = WxConditions[0].Feelslike + ChillBias; // šalčmyrės korekcija; feels_like jau turi vėjo/drėgmės pataisą
+  float feelsMax = feels, feelsMin = feels;             // dienos jutiminės ribos - pastaboms
+  for (int r = 0; r < 8; r++) {
+    time_t ft = WxForecast[r].Dt; struct tm *flt = localtime(&ft);
     if (flt->tm_hour < 6 || flt->tm_hour > 22) continue; // tik dienos metas
     float f = WxForecast[r].Feelslike + ChillBias;
     if (f > feelsMax) feelsMax = f;
     if (f < feelsMin) feelsMin = f;
   }
-  bool rainy  = (WxConditions[0].Rainfall > 0.1) || (WxForecast[0].Pop >= 0.35) || (WxForecast[1].Pop >= 0.35);
-  bool snowy  = (WxConditions[0].Snowfall > 0.05) || (WxForecast[0].Snowfall > 0.1);
-  bool windy  = (WxConditions[0].Windspeed >= 8);
-  int day = (WxConditions[0].Sunrise / 86400) % 3; // frazė keičiasi kasdien, bet nesikeičia tą pačią dieną
-  if (feels >= 22) {
-    a.tshirt = true;
-    const char* v[3] = {"Vasara kaip reikiant - užteks maikutės",
-                        "Karšta! Maikutė ir šalta arbata - daugiau nieko nereikia",
-                        "Šilta net šalčiausiam - drąsiai su maikute"};
-    a.text = v[day];
-  }
-  else if (feels >= 15) {
-    a.tshirt = true; a.sweater = true;
-    const char* v[3] = {"Gražu, bet ne karšta - maikutė, o megztinis ant pečių",
-                        "Megztinio diena: nei šalta, nei karšta - kaip tik",
-                        "Maikutė drąsiems, megztinis protingiems"};
-    a.text = v[day];
-  }
-  else if (feels >= 8) {
-    a.sweater = true; a.jacket = true;
-    const char* v[3] = {"Vėsoka - megztinis, o ant viršaus lengva striukė",
-                        "Megztinis ir striukė šiandien privalomi",
-                        "Oras sako: megztinis. Protas prideda: ir striukė"};
-    a.text = v[day];
-  }
-  else if (feels >= 0) {
-    a.jacket = true; a.hat = true;
-    const char* v[3] = {"Šalta! Šilta striukė ir kepurė - jokių kompromisų",
-                        "Striukė, kepurė ir greitas žingsnis - šiluma pati neateis",
-                        "Ausys padėkos už kepurę, o kaklas - už šaliką"};
-    a.text = v[day];
-  }
-  else {
-    a.jacket = true; a.hat = true;
-    const char* v[3] = {"Speigas! Žieminė striukė, kepurė, pirštinės - visa šarvuotė",
-                        "Oras tik pingvinams - renkis kaip į ekspediciją",
-                        "Šalčio ataka! Storiausia striukė ir arbata termose"};
-    a.text = v[day];
-  }
-  // Pastabos atskirai nuo bazinio patarimo - rodomos mažesniu šriftu (netrukdo pagrindinei žinutei)
+  bool heavyRain = (WxConditions[0].Rainfall > 2)  || (WxForecast[0].Pop >= 0.6)  || (WxForecast[1].Pop >= 0.6);
+  bool rainy     = (WxConditions[0].Rainfall > 0.1) || (WxForecast[0].Pop >= 0.35) || (WxForecast[1].Pop >= 0.35);
+  bool snowy     = (WxConditions[0].Snowfall > 0.05) || (WxForecast[0].Snowfall > 0.1);
+  bool windy     = (WxConditions[0].Windspeed >= 8);
+  int day = (WxConditions[0].Sunrise / 86400) % 3;      // frazė keičiasi kasdien
+
+  const uint8_t* g; const char* ge; const char* v[3];
+  if (feels >= 23)      { g = icon_maikute;      ge = "👕";
+    v[0]="Vasara! Užteks maikutės"; v[1]="Karšta - maikutė ir šalta arbata"; v[2]="Šilta net šalčiausiam - drąsiai su maikute"; }
+  else if (feels >= 21) { g = icon_marskineliai; ge = "👕";
+    v[0]="Šilta - marškinėliai kaip tik"; v[1]="Malonu - marškinėliai ir gera nuotaika"; v[2]="Vasariška - marškinėliai"; }
+  else if (feels >= 18) { g = icon_svarkelis;    ge = "🧥";
+    v[0]="Vėsoka vasara - plonas švarkelis"; v[1]="Gražu, bet ne karšta - užsimesk švarkelį"; v[2]="Švarkelio diena"; }
+  else if (feels >= 16) { g = icon_megztinis;    ge = "👚";
+    v[0]="Megztinio diena: nei šalta, nei karšta"; v[1]="Vėsu - megztinis kaip tik"; v[2]="Megztinis ir gera diena"; }
+  else if (feels >= 9)  { g = icon_striuke;      ge = "🧥";
+    v[0]="Gaivu - lengva striukė"; v[1]="Vėsoka - užsimesk striukę"; v[2]="Striukės oras"; }
+  else if (feels >= -3) { g = icon_paltas;       ge = "🧥";
+    v[0]="Šalta - laikas paltui"; v[1]="Paltas ir šiltas šalikas nepakenks"; v[2]="Rimtai atvėso - paltas"; }
+  else                  { g = icon_pukine;       ge = "🧥";
+    v[0]="Speigas! Pūkinė ir jokių kompromisų"; v[1]="Oras tik pingvinams - pūkinė"; v[2]="Šalčio ataka - storiausia pūkinė"; }
+  a.text = v[day];
+  addCloth(a, g, ge);
+
+  if (windy)          addCloth(a, icon_salikas,   "🧣");   // stiprus vėjas -> šalikas
+  if (heavyRain)      addCloth(a, icon_kapisonas, "🧥");   // smarkiai lyja -> drabužis su kapišonu
+  else if (rainy)     addCloth(a, icon_sketis,    "☂️");   // lietus -> skėtis
+
   if (feelsMax - feels >= 6)
     a.note = "Po pietų iki " + String((int)round(feelsMax)) + "° - renkis sluoksniais";
   else if (feels - feelsMin >= 6)
     a.note = "Vakare atvės iki " + String((int)round(feelsMin)) + "° - pasiimk šiltesnį";
-  String extra;                                  // krituliai/vėjas (ikonos - nepriklausomai nuo teksto)
-  if (snowy)      { extra = "Sninga - neperšlampami batai!"; a.hat = true; }
-  else if (rainy) { extra = "Skėtis būtinas!"; a.umbrella = true; }
-  else if (windy) { extra = "Vėjas piktas - užsisek!"; }
+  String extra;
+  if (snowy)          extra = "Sninga - neperšlampami batai!";
+  else if (heavyRain) extra = "Smarkiai lyja - su kapišonu!";
+  else if (rainy)     extra = "Pasiimk skėtį!";
+  else if (windy)     extra = "Vėjas piktas - užsisek šaliką!";
   if (extra.length()) { if (a.note.length()) a.note += ".  "; a.note += extra; }
   return a;
 }
@@ -1319,11 +1315,7 @@ void SaveDailyAdvice() {
   if (prefs.getInt("advDay", -1) == tdy) return; // šiandien jau įsiminta rytinė versija
   ClothingAdvice a = GetClothingAdvice();
   String emo;
-  if (a.tshirt)   emo += "👕";
-  if (a.sweater)  emo += "👚"; // megztinis - drabužis, ne siūlų kamuolys (sweater emoji Unicode neturi)
-  if (a.jacket)   emo += "🧥";
-  if (a.hat)      emo += "🧢";
-  if (a.umbrella) emo += "☂️";
+  for (int i = 0; i < a.n; i++) emo += a.emos[i];
   String full = a.text;
   if (a.note.length()) full += ". " + a.note;
   prefs.putInt("advDay", tdy);
@@ -1348,6 +1340,14 @@ void drawRoundRect(int x, int y, int w, int h, int r) {
   drawArcCorner(x + w - r, y + r,     r, 1.5 * PI, 2 * PI);   // v. dešinė
   drawArcCorner(x + w - r, y + h - r, r, 0,        0.5 * PI); // a. dešinė
   drawArcCorner(x + r,     y + h - r, r, 0.5 * PI, PI);       // a. kairė
+}
+
+// Nespalvoto bitmapo (clothing_icons.h, 1bpp, bitas=1 => juoda) piešimas viršutiniu kairiu kampu (x,y)
+void DrawIcon(int x, int y, const uint8_t* bmp) {
+  for (int row = 0; row < ICON_H; row++)
+    for (int col = 0; col < ICON_W; col++)
+      if (bmp[row * ICON_BPR + (col >> 3)] & (0x80 >> (col & 7)))
+        drawPixel(x + col, y + row, Black);
 }
 
 // --- Drabužių piktogramos: IDENTIŠKOS docs/mockup_zmonos.svg siluetams ---------------------
@@ -1532,12 +1532,8 @@ void DisplayWifeMode() {
 
   // --- R2: aprangos patarimas (be rėmelio; ikonos kairėje, tekstas fiksuotoje zonoje) ---
   ClothingAdvice adv = GetClothingAdvice();
-  int iy = 206, is_ = 75, ix = 68;                                                    // ikonos 206..275 - centruotos juostoje 164..324 (kaip makete)
-  if (adv.tshirt)   { DrawTShirtIcon(ix, iy, is_);   ix += 100; }
-  if (adv.sweater)  { DrawSweaterIcon(ix, iy, is_);  ix += 100; }
-  if (adv.jacket)   { DrawJacketIcon(ix, iy, is_);   ix += 100; }
-  if (adv.hat)      { DrawHatIcon(ix, iy, is_);      ix += 100; }
-  if (adv.umbrella) { DrawUmbrellaIcon(ix, iy, is_); ix += 100; }                     // skėtis tik kai reikia
+  int iy = 208, ix = 40;                                                              // bitmapai 72x72; centruoti juostoje 164..324 (top=208)
+  for (int i = 0; i < adv.n; i++) { DrawIcon(ix, iy, adv.icons[i]); ix += 82; }       // iki 3 ikonų: x 40,122,204 (iki tx=350)
   const int tx = 350, tw = 590;                                                       // teksto zona x 350..940
   setFont(&OpenSans8B);
   drawStringTop(tx, 168, "KAIP RENGTIS", LEFT);                                       // 168..188

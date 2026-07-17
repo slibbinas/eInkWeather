@@ -34,6 +34,7 @@ int  textHeightOf(String text);
 void fillTriangle(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color);
 void drawPixel(int x, int y, uint16_t color);
 void drawStringAuto(int x, int y, String text, alignment align);
+void DrawIcon(int x, int y, const uint8_t* bmp);   // nespalvoto drabužio bitmapo piešimas
 
 // --- PAGRINDINIO EKRANO PIEŠIMO BLOKAI ---
 void DisplayWeather();
