@@ -42,7 +42,7 @@
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
-#define FW_VERSION 9             // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
+#define FW_VERSION 10            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -832,6 +832,25 @@ void TgSendMessage(const String& chatId, const String& text, bool withButtons) {
   TgApiCall("sendMessage", body);
 }
 
+// Nuotrauka per URL (Telegram serveris pats atsisiunčia) su antrašte ir tais pačiais reply mygtukais.
+// Naudojama vakariniam klausimui: drabužių derinio paveikslas hostinamas tinymakerwifi.com/oi/<derinys>.png
+void TgSendPhoto(const String& chatId, const String& photoUrl, const String& caption, bool withButtons) {
+  DynamicJsonDocument doc(4096);
+  doc["chat_id"] = chatId;
+  doc["photo"]   = photoUrl;
+  doc["caption"] = caption;
+  if (withButtons) {
+    JsonObject rm = doc.createNestedObject("reply_markup");
+    JsonArray kb = rm.createNestedArray("keyboard");
+    JsonArray r1 = kb.createNestedArray(); r1.add("🥶 Buvo šalta");  r1.add("👍 Kaip tik");
+    JsonArray r2 = kb.createNestedArray(); r2.add("🥵 Buvo karšta"); r2.add("🤷 Nesilaikiau");
+    rm["one_time_keyboard"] = true;
+    rm["resize_keyboard"]   = true;
+  }
+  String body; serializeJson(doc, body);
+  TgApiCall("sendPhoto", body);
+}
+
 // Reply mygtuko tekstas -> atsiliepimo kodas
 String FbCodeFromText(const String& t) {
   if (t.indexOf("šalta") >= 0)       return "FB_COLD";
@@ -953,6 +972,14 @@ void HandleTgCommand(const String& text, const String& cid) { // /status, /log, 
   else if (cmd.startsWith("/demo")) {
     TgSendMessage(cid, "🖥 Interaktyvus stotelės demo naršyklėje:\nhttps://tinymakerwifi.com/orai", false);
   }
+  else if (cmd.startsWith("/foto")) {
+    prefs.putBool("advPhoto", true);
+    TgSendMessage(cid, "📷 Vakarinis klausimas eis su drabužių nuotrauka.", false);
+  }
+  else if (cmd.startsWith("/emoji")) {
+    prefs.putBool("advPhoto", false);
+    TgSendMessage(cid, "🙂 Vakarinis klausimas eis su emoji (be nuotraukos).", false);
+  }
   else if (cmd.startsWith("/atnaujinti")) {
     if (GhPat.length() == 0)
       TgSendMessage(cid, "Atsinaujinimas neįjungtas. Įveskite GitHub raktą: čia komanda /pat github_pat_xxxxx, arba per Setup portalą (mygtukas 3-8 s).", false);
@@ -988,7 +1015,7 @@ void HandleTgCommand(const String& text, const String& cid) { // /status, /log, 
     else TgSendMessage(cid, "Naudojimas: /laikas 20:00 (valanda 0-23)", false);
   }
   else { // /help, /start ar nežinoma komanda
-    TgSendMessage(cid, "Komandos:\n/status – dabartinė būsena\n/statistika – savaitės atsiliepimų suvestinė\n/vadovas – naudotojo vadovas\n/kvietimas – paruošti kvietimą (persiunčiama nuoroda, gavėjui tik PRADĖTI paspausti)\n/vardas Justina – kaip kreiptis į atsakinėjantį žmogų\n/laikas 20:00 – klausimo apie aprangą valanda\n/ota <raktas> – įjungti OTA įkėlimo režimą\n/atnaujinti – patikrinti ir įdiegti naujausią programą\n/pat <raktas> – įvesti GitHub raktą atsinaujinimui\n/demo – interaktyvaus demo nuoroda\n/log – veikimo žurnalas (kaip serial)\n/zmona /adminas – registracija ranka\n/help – ši žinutė", false);
+    TgSendMessage(cid, "Komandos:\n/status – dabartinė būsena\n/statistika – savaitės atsiliepimų suvestinė\n/vadovas – naudotojo vadovas\n/kvietimas – paruošti kvietimą (persiunčiama nuoroda, gavėjui tik PRADĖTI paspausti)\n/vardas Justina – kaip kreiptis į atsakinėjantį žmogų\n/laikas 20:00 – klausimo apie aprangą valanda\n/ota <raktas> – įjungti OTA įkėlimo režimą\n/atnaujinti – patikrinti ir įdiegti naujausią programą\n/pat <raktas> – įvesti GitHub raktą atsinaujinimui\n/demo – interaktyvaus demo nuoroda\n/foto /emoji – vakarinis klausimas su nuotrauka ar emoji\n/log – veikimo žurnalas (kaip serial)\n/zmona /adminas – registracija ranka\n/help – ši žinutė", false);
   }
 }
 
@@ -1065,11 +1092,21 @@ void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
     // Klausime cituojamas rytinis patarimas (kad būtų aišku, KĄ vertinti) + kreipinys vardu
     String nm = FeedbackName();
     String hi = (askTo == wife && nm != "žmona") ? ("Labas, " + nm + "! 🙂 ") : "";
-    String q = hi + "Kaip šiandien tiko apranga pagal mano patarimą?";
-    if (prefs.getInt("advDay", -1) == today)
-      q = hi + "Ryte siūliau: " + prefs.getString("advEmo", "") + "\n„" + prefs.getString("advTxt", "")
-        + "\"\n\nKaip tiko? Mygtukai žinutės apačioje 🙂";
-    TgSendMessage(askTo, q, true);
+    if (prefs.getInt("advDay", -1) == today) {
+      String wx  = prefs.getString("advWx", "");
+      String txt = prefs.getString("advTxt", "");
+      String head = hi + (wx.length() ? (wx + "\n") : "");
+      String comb = prefs.getString("advIcons", "");
+      if (prefs.getBool("advPhoto", true) && comb.length()) {                        // NUMATYTA: drabužių foto per URL
+        String cap = head + "Ryte siūliau tai (žr. paveikslą).\n„" + txt + "\"\n\nKaip tiko? Mygtukai žinutės apačioje 🙂";
+        TgSendPhoto(askTo, "https://tinymakerwifi.com/oi/" + comb + ".png", cap, true);
+      } else {                                                                       // emoji režimas (/emoji)
+        TgSendMessage(askTo, head + "Ryte siūliau: " + prefs.getString("advEmo", "")
+          + "\n„" + txt + "\"\n\nKaip tiko? Mygtukai žinutės apačioje 🙂", true);
+      }
+    } else {
+      TgSendMessage(askTo, hi + "Kaip šiandien tiko apranga pagal mano patarimą?", true);
+    }
     LastAskDay = today; prefs.putInt("lastAsk", today);
   }
 }
@@ -1248,12 +1285,13 @@ struct ClothingAdvice {
   String text;                 // bazinis patarimas - didelis šriftas (18B)
   String note;                 // dienos pokytis / krituliai / vėjas - mažesnis (12B)
   const uint8_t* icons[4];     // drabužių bitmapų rodyklės (pagrindinis + modifikatoriai)
-  const char*    emos[4];      // atitinkami emoji - vakariniam Telegram klausimui
+  const char*    emos[4];      // atitinkami emoji - vakariniam Telegram klausimui (emoji režimas)
+  const char*    keys[4];      // drabužių raktai (foto URL deriniui: pvz. "paltas_salikas_sketis")
   int n;
 };
 
-static void addCloth(ClothingAdvice &a, const uint8_t* ic, const char* em) {
-  if (a.n < 4) { a.icons[a.n] = ic; a.emos[a.n] = em; a.n++; }
+static void addCloth(ClothingAdvice &a, const uint8_t* ic, const char* em, const char* key) {
+  if (a.n < 4) { a.icons[a.n] = ic; a.emos[a.n] = em; a.keys[a.n] = key; a.n++; }
 }
 
 ClothingAdvice GetClothingAdvice() {
@@ -1273,27 +1311,27 @@ ClothingAdvice GetClothingAdvice() {
   bool windy     = (WxConditions[0].Windspeed >= 8);
   int day = (WxConditions[0].Sunrise / 86400) % 3;      // frazė keičiasi kasdien
 
-  const uint8_t* g; const char* ge; const char* v[3];
-  if (feels >= 23)      { g = icon_maikute;      ge = "👕";
+  const uint8_t* g; const char* ge; const char* gk; const char* v[3];
+  if (feels >= 23)      { g = icon_maikute;      ge = "👕"; gk = "maikute";
     v[0]="Vasara! Užteks maikutės"; v[1]="Karšta - maikutė ir šalta arbata"; v[2]="Šilta net šalčiausiam - drąsiai su maikute"; }
-  else if (feels >= 21) { g = icon_marskineliai; ge = "👕";
+  else if (feels >= 21) { g = icon_marskineliai; ge = "👕"; gk = "marskineliai";
     v[0]="Šilta - marškinėliai kaip tik"; v[1]="Malonu - marškinėliai ir gera nuotaika"; v[2]="Vasariška - marškinėliai"; }
-  else if (feels >= 18) { g = icon_svarkelis;    ge = "🧥";
-    v[0]="Vėsoka vasara - plonas švarkelis"; v[1]="Gražu, bet ne karšta - užsimesk švarkelį"; v[2]="Švarkelio diena"; }
-  else if (feels >= 16) { g = icon_megztinis;    ge = "👚";
-    v[0]="Megztinio diena: nei šalta, nei karšta"; v[1]="Vėsu - megztinis kaip tik"; v[2]="Megztinis ir gera diena"; }
-  else if (feels >= 9)  { g = icon_striuke;      ge = "🧥";
+  else if (feels >= 18) { g = icon_svarkelis;    ge = "🧥"; gk = "svarkelis";
+    v[0]="Vėsoka vasara - plonas švarkelis"; v[1]="Gražu, bet ne karšta - užsimesk švarkelį"; v[2]="Švarkelio oras"; }
+  else if (feels >= 16) { g = icon_megztinis;    ge = "👚"; gk = "megztinis";
+    v[0]="Megztinis: nei šalta, nei karšta"; v[1]="Vėsu - megztinis kaip tik"; v[2]="Megztinis - kaip tik"; }
+  else if (feels >= 9)  { g = icon_striuke;      ge = "🧥"; gk = "striuke";
     v[0]="Gaivu - lengva striukė"; v[1]="Vėsoka - užsimesk striukę"; v[2]="Striukės oras"; }
-  else if (feels >= -3) { g = icon_paltas;       ge = "🧥";
+  else if (feels >= -3) { g = icon_paltas;       ge = "🧥"; gk = "paltas";
     v[0]="Šalta - laikas paltui"; v[1]="Paltas ir šiltas šalikas nepakenks"; v[2]="Rimtai atvėso - paltas"; }
-  else                  { g = icon_pukine;       ge = "🧥";
+  else                  { g = icon_pukine;       ge = "🧥"; gk = "pukine";
     v[0]="Speigas! Pūkinė ir jokių kompromisų"; v[1]="Oras tik pingvinams - pūkinė"; v[2]="Šalčio ataka - storiausia pūkinė"; }
   a.text = v[day];
-  addCloth(a, g, ge);
+  addCloth(a, g, ge, gk);
 
-  if (windy)          addCloth(a, icon_salikas,   "🧣");   // stiprus vėjas -> šalikas
-  if (heavyRain)      addCloth(a, icon_kapisonas, "🧥");   // smarkiai lyja -> drabužis su kapišonu
-  else if (rainy)     addCloth(a, icon_sketis,    "☂️");   // lietus -> skėtis
+  if (windy)          addCloth(a, icon_salikas,   "🧣", "salikas");    // stiprus vėjas -> šalikas
+  if (heavyRain)      addCloth(a, icon_kapisonas, "🧥", "kapisonas");  // smarkiai lyja -> drabužis su kapišonu
+  else if (rainy)     addCloth(a, icon_sketis,    "☂️", "sketis");     // lietus -> skėtis
 
   if (feelsMax - feels >= 6)
     a.note = "Po pietų iki " + String((int)round(feelsMax)) + "° - renkis sluoksniais";
@@ -1314,13 +1352,25 @@ void SaveDailyAdvice() {
   int tdy = (int)(time(NULL) / 86400);
   if (prefs.getInt("advDay", -1) == tdy) return; // šiandien jau įsiminta rytinė versija
   ClothingAdvice a = GetClothingAdvice();
-  String emo;
-  for (int i = 0; i < a.n; i++) emo += a.emos[i];
+  String emo, comb;
+  for (int i = 0; i < a.n; i++) { emo += a.emos[i]; if (i) comb += "_"; comb += a.keys[i]; }
   String full = a.text;
   if (a.note.length()) full += ". " + a.note;
+  // Trumpas oras (rytinis, vakariniam klausimui): ryto temp + dienos maks + lietus
+  float dMax = WxConditions[0].Temperature, pop = WxForecast[0].Pop;
+  for (int r = 0; r < 8; r++) {
+    time_t ft = WxForecast[r].Dt; struct tm *flt = localtime(&ft);
+    if (flt->tm_hour < 6 || flt->tm_hour > 22) continue;
+    if (WxForecast[r].Temperature > dMax) dMax = WxForecast[r].Temperature;
+    if (WxForecast[r].Pop > pop) pop = WxForecast[r].Pop;
+  }
+  String wx = "Ryte " + String((int)round(WxConditions[0].Temperature)) + "°, dieną iki " + String((int)round(dMax)) + "°";
+  wx += (pop >= 0.35) ? (", lietaus " + String((int)round(pop * 100)) + "%") : ", be lietaus";
   prefs.putInt("advDay", tdy);
   prefs.putString("advTxt", full);
   prefs.putString("advEmo", emo);
+  prefs.putString("advIcons", comb);   // foto URL derinys
+  prefs.putString("advWx", wx);        // trumpas oras
 }
 
 // Apvalaus stačiakampio pagalbinės (e-ink neturi native rounded-rect)
