@@ -202,6 +202,14 @@ void LoadConfig() { // NVS reikšmės perrašo owm_credentials.h numatytąsias
   SleepHour  = prefs.getInt("sleepHour",   SleepHour);
   TgToken    = prefs.getString("tgToken",  String(telegramBotToken));
   FeedbackHr = prefs.getInt("fbHour",      FeedbackHour);
+  // Boto pakeitimas: tgOffset ir botUser galioja tik konkrečiam botui - su nauju token'u
+  // senas offset tyliai "surytų" visas žinutes, o /kvietimas rodytų seno boto nuorodą.
+  if (TgToken.length() && prefs.getString("tgTokUsed", "") != TgToken) {
+    prefs.remove("tgOffset");
+    prefs.remove("botUser");
+    prefs.putString("tgTokUsed", TgToken);
+    LOGT("TG token pasikeite - offset/botUser isvalyti");
+  }
 }
 
 // Išvalo ir fizinį ekraną, IR framebuffer'į. Vien epd_clear() buferio nevalo -
