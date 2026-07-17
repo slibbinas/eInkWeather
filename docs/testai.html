@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>eInkWeather — testų pultas</title>
+<style>
+:root{--bg:#f7f7f8;--card:#fff;--text:#1d1f24;--muted:#6b7280;--border:#e2e4e9;--accent:#f07a1a;--code-bg:#f0f1f3;--ok:#1a9c46;--bad:#d43a3a}
+@media (prefers-color-scheme: dark){:root{--bg:#15171c;--card:#1c1f26;--text:#e6e8ec;--muted:#9aa1ad;--border:#2a2e37;--accent:#ff9740;--code-bg:#242830}}
+:root[data-theme="dark"]{--bg:#15171c;--card:#1c1f26;--text:#e6e8ec;--muted:#9aa1ad;--border:#2a2e37;--accent:#ff9740;--code-bg:#242830}
+:root[data-theme="light"]{--bg:#f7f7f8;--card:#fff;--text:#1d1f24;--muted:#6b7280;--border:#e2e4e9;--accent:#f07a1a;--code-bg:#f0f1f3}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.45}
+.page{max-width:760px;margin:0 auto;padding:14px 12px 60px}
+h1{font-size:20px;margin:10px 0 2px}
+.sub{color:var(--muted);font-size:13px;margin:0 0 10px}
+.bar{position:sticky;top:0;background:var(--bg);z-index:5;padding:8px 0;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.prog{flex:1;min-width:140px;height:10px;background:var(--code-bg);border-radius:5px;overflow:hidden}
+.prog i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.bar b{font-size:13px;font-variant-numeric:tabular-nums}
+.bar button{border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:8px;padding:9px 12px;font-size:13px;cursor:pointer;min-height:40px}
+.bar button:hover{border-color:var(--accent);color:var(--accent)}
+h2{font-size:15px;margin:20px 0 8px;color:var(--accent)}
+h2 small{color:var(--muted);font-weight:400;font-size:12px}
+.t{display:flex;gap:8px;align-items:flex-start;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px;margin:6px 0}
+.t.pass{border-color:var(--ok)}
+.t.fail{border-color:var(--bad)}
+.t .txt{flex:1;font-size:14px}
+.t .txt small{display:block;color:var(--muted);font-size:12px}
+.t .btns{display:flex;gap:6px}
+.t button{width:42px;height:42px;border-radius:8px;border:1px solid var(--border);background:var(--code-bg);color:var(--muted);font-size:16px;cursor:pointer}
+.t.pass .yes{background:var(--ok);color:#fff;border-color:var(--ok)}
+.t.fail .no{background:var(--bad);color:#fff;border-color:var(--bad)}
+.note{font-size:12.5px;color:var(--muted);background:var(--card);border:1px dashed var(--border);border-radius:10px;padding:10px;margin:8px 0}
+code{font-family:ui-monospace,Consolas,monospace;background:var(--code-bg);padding:1px 6px;border-radius:5px;font-size:.92em}
+</style>
+</head>
+<body>
+<div class="page">
+<h1>🌤 eInkWeather — testų pultas</h1>
+<p class="sub">Žymėkite ✓/✗ testuodami (išsisaugo šiame įrenginyje). Pabaigoje — „Kopijuoti ataskaitą" ir įklijuokite Claude sesijoje.</p>
+<div class="bar">
+  <div class="prog"><i id="pfill"></i></div><b id="ptxt">0/0</b>
+  <button onclick="copyReport()">📋 Kopijuoti ataskaitą</button>
+  <button onclick="resetAll()">↺ Išvalyti</button>
+</div>
+
+<h2>A. Ekranai ir mygtukas <small>— spausti tik įrenginiui miegant</small></h2>
+<div class="t" data-id="a1"><div class="txt">Trumpas paspaudimas → per ~30–40 s ekranas persijungia į kitą režimą<small>žmonos ⇄ pilnas; ciklas: WiFi → orai → lėtas perpiešimas</small></div><div class="btns"><button class="yes">✓</button><button class="no">✗</button></div></div>
+<div class="t" data-id="a2"><div class="txt">Žmonos ekrane niekas nepersidengia<small>„jaučiasi kaip" / didysis skaičius / linijos / korekcijos eilutė / Rytas-Diena-Vakaras / status baras</small></div><div class="btns"><button class="yes">✓</button><button class="no">✗</button></div></div>
+<div class="t" data-id="a3"><div class="txt">Pilname ekrane grafikai pilno dydžio, status baras apačioje nesikerta</div><div class="btns"><button class="yes">✓</button><button class="no">✗</button></div></div>
+<div class="t" data-id="a4"><div class="txt">Režimas įsimenamas: perjungus į žmonos ir spustelėjus RESET — po perkrovimo lieka žmonos</div><div class="btns"><button class="yes">✓</button><button class="no">✗</button></div></div>
+
+<h2>B. Nustatymų portalas</h2>
+<div class="t" data-id="b1"><div class="txt">Mygtukas 3–8 s → ekrane „Nustatymų režimas"; telefonu <code>OruStotele-Setup</code> → <code>192.168.4.1</code> atsidaro<small>Setup laukeliuose — esamos reikšmės</small></div><div class="btns"><button class="yes">✓</button><button class="no">✗</button></div></div>
+<div class="t" data-id="b2"><div class="txt">Nieko neišsaugojus (Exit / 5 min) įrenginys grįžta į įprastą darbą</div><div class="btns"><button class="yes">✓</button><button class="no">✗</button></div></div>
+
+<h2>C. OTA</h2>
+<div class="t" data-id="c1"><div class="txt">Mygtukas ≥8 s → OTA langas su IP ir tuščia juosta; apačioje „Mygtukas dar kartą — Telegram testas"</div><div class="btns"><button class="yes">✓</button><button class="no">✗</button></div></div>
+<div class="t" data-id="c2"><div class="txt">Per 5 min nieko neįkėlus — pats grįžta į orų rodymą</div><div class="btns"><button class="yes">✓</button><button class="no">✗</button></div></div>
+
+<h2>D. Telegram — adminas <small>— atsakymai ateina per ≤30 min arba po RESET</small></h2>
+<div class="t" data-id="d1"><div class="txt"><code>/vardas Justina</code> → „Gerai, nuo šiol kreipsiuos: Justina"</div><div class="btns"><button class="yes">✓</button><button class="no">✗</button></div></div>
+<div class="t" data-id="d2"><div class="txt"><code>/status</code> → būsena su orais, baterija, korekcija, atsiliepimų sumomis</div><div class="btns"><button class="yes">✓</button><button class="no">✗</button></div></div>
+<div class="t" data-id="d3"><div class="txt"><code>/vadovas</code> → 2 žinutės su vadovu</div><div class="btns"><button class="yes">✓</button><button class="no">✗</button></div></div>
+<div class="t" data-id="d4"><div class="txt"><code>/statistika</code> → savaitės suvestinė (pradžioje „atsiliepimų dar nebuvo")</div><div class="btns"><button class="yes">✓</button><button class="no">✗</button></div></div>
+<div class="t" data-id="d5"><div class="txt"><code>/log</code> → žurnalas su WiFi/laiko/orų eilutėmis</div><div class="btns"><button class="yes">✓</button><button class="no">✗</button></div></div>
+<div class="t" data-id="d6"><div class="txt"><code>/kvietimas</code> → 2 žinutės: instrukcija + persiunčiama žinutė su nuoroda</div><div class="btns"><button class="yes">✓</button><button class="no">✗</button></div></div>
+
+<h2>E. Telegram — žmona</h2>
+<div class="t" data-id="e1"><div class="txt">Persiuntus kvietimą: ji nuoroda → PRADĖTI → jai pasisveikinimas vardu, jums „✅ prisijungė"</div><div class="btns"><button class="yes">✓</button><button class="no">✗</button></div></div>
+<div class="t" data-id="e2"><div class="txt">Jos <code>/statistika</code> ir <code>/vadovas</code> veikia; <code>/status</code> jai neatsako (tik adminui)</div><div class="btns"><button class="yes">✓</button><button class="no">✗</button></div></div>
+
+<h2>F. Grįžtamasis ryšys</h2>
+<div class="t" data-id="f1"><div class="txt">OTA lange antras paspaudimas → Telegram testas: švarus langas, telefone paspaudus mygtuką ekranas rodo „Veikia! Gauta: …"</div><div class="btns"><button class="yes">✓</button><button class="no">✗</button></div></div>
+<div class="t" data-id="f2"><div class="txt">20:00 klausimas ateina ŽMONAI, su kreipiniu vardu ir ryto citata (👕👚 + tekstas)</div><div class="btns"><button class="yes">✓</button><button class="no">✗</button></div></div>
+<div class="t" data-id="f3"><div class="txt">Paspaudus atsakymo mygtuką — žinutė matosi pokalbyje iškart; per ≤30 min botas padėkoja, adminas gauna kopiją</div><div class="btns"><button class="yes">✓</button><button class="no">✗</button></div></div>
+<div class="t" data-id="f4"><div class="txt">Žmonos ekrane atsinaujina: korekcija, „atsakyta: MM-DD", išvada</div><div class="btns"><button class="yes">✓</button><button class="no">✗</button></div></div>
+<div class="t" data-id="f5"><div class="txt">„🤷 Nesilaikiau" — korekcija nesikeičia, bet /statistika įrašą rodo</div><div class="btns"><button class="yes">✓</button><button class="no">✗</button></div></div>
+
+<h2>G. WiFi atsparumas <small>— nebūtina, jei tingisi 🙂</small></h2>
+<div class="t" data-id="g1"><div class="txt">Išjungus routerį + RESET → langas „Nepavyko prisijungti… palaikykite 3–8 s"; įjungus routerį per ~30 min atsistato savaime</div><div class="btns"><button class="yes">✓</button><button class="no">✗</button></div></div>
+
+<div class="note">Naudojimo scenarijus „kaip šeimai": jūs gyvenat pilname režime, žmona — paprastame; ji vakare paspaudžia vieną mygtuką; jūs kartą per savaitę žvilgtelit <code>/statistika</code>. Daugiau nieko daryti nereikia.</div>
+
+<script>
+const KEY='ew-tests-01';
+let st={}; try{st=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){}
+const items=[...document.querySelectorAll('.t')];
+function apply(el){ const id=el.dataset.id; el.classList.toggle('pass',st[id]==='p'); el.classList.toggle('fail',st[id]==='f'); }
+function save(){ localStorage.setItem(KEY,JSON.stringify(st)); prog(); }
+function prog(){ const d=items.filter(e=>st[e.dataset.id]).length;
+  document.getElementById('pfill').style.width=(d/items.length*100)+'%';
+  document.getElementById('ptxt').textContent=d+'/'+items.length; }
+items.forEach(el=>{ apply(el);
+  el.querySelector('.yes').onclick=()=>{ st[el.dataset.id]=st[el.dataset.id]==='p'?undefined:'p'; apply(el); save(); };
+  el.querySelector('.no').onclick =()=>{ st[el.dataset.id]=st[el.dataset.id]==='f'?undefined:'f'; apply(el); save(); };
+});
+prog();
+function copyReport(){
+  let out='eInkWeather testai:\n', p=0,f=0,l=0;
+  items.forEach(el=>{ const s=st[el.dataset.id];
+    const t=el.querySelector('.txt').childNodes[0].textContent.trim();
+    if(s==='p'){p++; out+='[PASS] '+t+'\n';}
+    else if(s==='f'){f++; out+='[FAIL] '+t+'\n';}
+    else {l++; out+='[----] '+t+'\n';} });
+  out+='Total: '+p+' pass / '+f+' fail / '+l+' left';
+  navigator.clipboard.writeText(out).then(()=>alert('Ataskaita nukopijuota — įklijuokite Claude sesijoje.'));
+}
+function resetAll(){ if(confirm('Išvalyti visas žymes?')){ st={}; localStorage.removeItem(KEY); items.forEach(apply); prog(); } }
+</script>
+</div>
+</body>
+</html>
