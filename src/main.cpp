@@ -700,6 +700,54 @@ String FbLabel(const String& data) {
   return "";
 }
 
+String FeedbackName() { // kaip kreiptis į atsakinėjantį žmogų (nustatoma /vardas komanda)
+  return prefs.getString("wifeName", "žmona");
+}
+
+// Atsiliepimų istorija NVS: "19923C;19924O;..." (dienos nr + kodo raidė). Laikomi ~15 paskutinių.
+void AppendFbHist(char code) {
+  String h = prefs.getString("fbHist", "");
+  h += String((int)(time(NULL) / 86400)) + String(code) + ";";
+  int cnt = 0;
+  for (unsigned int i = 0; i < h.length(); i++) if (h[i] == ';') cnt++;
+  while (cnt > 15) { h = h.substring(h.indexOf(';') + 1); cnt--; }
+  prefs.putString("fbHist", h);
+}
+
+// Savaitės statistika - rodoma ir adminui, ir atsakinėjančiam žmogui (/statistika)
+String StatsMessage() {
+  const char* wd[7] = {"Sk", "Pr", "An", "Tr", "Kt", "Pn", "Št"};
+  String h = prefs.getString("fbHist", "");
+  int today = (int)(time(NULL) / 86400);
+  int nC = 0, nH = 0, nO = 0, nS = 0;
+  String lines = "";
+  unsigned int pos = 0;
+  while (pos < h.length()) {
+    int semi = h.indexOf(';', pos);
+    if (semi < 0) break;
+    String e = h.substring(pos, semi);
+    pos = semi + 1;
+    if (e.length() < 2) continue;
+    char code = e[e.length() - 1];
+    int d = e.substring(0, e.length() - 1).toInt();
+    if (today - d >= 7) continue;                       // tik paskutinės 7 dienos
+    time_t t = (time_t)d * 86400L;
+    struct tm *lt = gmtime(&t);
+    char db[16]; sprintf(db, "%s %02d-%02d", wd[lt->tm_wday], lt->tm_mon + 1, lt->tm_mday);
+    String lbl;
+    if      (code == 'C') { nC++; lbl = "🥶 buvo šalta"; }
+    else if (code == 'H') { nH++; lbl = "🥵 buvo karšta"; }
+    else if (code == 'O') { nO++; lbl = "👍 kaip tik"; }
+    else if (code == 'S') { nS++; lbl = "🤷 nesilaikyta"; }
+    lines += String(db) + ": " + lbl + "\n";
+  }
+  String s = "📊 Savaitės statistika (" + FeedbackName() + ")\n";
+  s += lines.length() ? lines : "Šią savaitę atsiliepimų dar nebuvo.\n";
+  s += "\nIš viso: 👍 " + String(nO) + " · 🥶 " + String(nC) + " · 🥵 " + String(nH) + " · 🤷 " + String(nS);
+  s += "\n🧥 Korekcija: " + String(ChillBias, 1) + "°C\nIšvada: " + FeedbackConclusion();
+  return s;
+}
+
 // Mygtukai: REPLY klaviatūra (ne inline!). Priežastis: įrenginys miega iki 30 min., o inline
 // callback'ą Telegram reikalauja patvirtinti per kelias sekundes - kitaip telefone tiesiog
 // nieko neįvyksta (callback_query_id pasensta). Reply mygtukas iškart išsiunčia paprastą
@@ -761,12 +809,13 @@ void ApplyFeedback(const String& data, const String& cid) {
   prefs.putInt("fbCold", FbCold); prefs.putInt("fbHot", FbHot);
   prefs.putInt("fbOk", FbOk);     prefs.putInt("fbSkip", FbSkip);
   prefs.putInt("fbLast", FbLastDay);
+  AppendFbHist(data.charAt(3)); // FB_[C]OLD / FB_[H]OT / FB_[O]K / FB_[S]KIP - 4-ta raidė unikali
   LOGT("TG atsiliepimas " + data + " -> korekcija " + String(ChillBias, 1));
   TgSendMessage(cid, reply, false);
-  // Kopija adminui, jei atsakė žmona
+  // Kopija adminui, jei atsakė ne jis pats
   String admin = prefs.getString("chatAdmin", prefs.getString("chatId", String(telegramChatID)));
   if (admin.length() && admin != cid)
-    TgSendMessage(admin, "👗 Žmona atsakė: " + FbLabel(data) + "\nIšvada: " + FeedbackConclusion(), false);
+    TgSendMessage(admin, "👗 " + FeedbackName() + " atsakė: " + FbLabel(data) + "\nIšvada: " + FeedbackConclusion(), false);
 }
 
 // Senų inline mygtukų apdorojimas (jei tokių dar kabo Telegram eilėje)
@@ -795,6 +844,18 @@ void HandleTgCommand(const String& text, const String& cid) { // /status, /log, 
   else if (cmd.startsWith("/log")) {
     TgSendMessage(cid, RunLog.length() ? ("🧾 Žurnalas:\n" + RunLog) : "Žurnalas tuščias.", false);
   }
+  else if (cmd.startsWith("/statistika")) {
+    TgSendMessage(cid, StatsMessage(), false);
+  }
+  else if (cmd.startsWith("/vardas")) {
+    String name = text.substring(7); // originalus tekstas - išsaugom didžiąsias/lietuviškas raides
+    name.trim();
+    if (name.length()) {
+      prefs.putString("wifeName", name);
+      TgSendMessage(cid, "Gerai, nuo šiol kreipsiuos: " + name + " 🙂", false);
+    }
+    else TgSendMessage(cid, "Naudojimas: /vardas Justina", false);
+  }
   else if (cmd.startsWith("/kvietimas")) {
     // Paprasčiausias žmonos prijungimas: botas paruošia persiunčiamą žinutę su deep-link nuoroda.
     // Žmonai lieka DU bakstelėjimai: nuoroda -> PRADĖTI. Jokio rašymo, jokių komandų.
@@ -821,7 +882,7 @@ void HandleTgCommand(const String& text, const String& cid) { // /status, /log, 
     ESP.restart();
   }
   else { // /help, /start ar nežinoma komanda
-    TgSendMessage(cid, "Komandos:\n/status – dabartinė būsena ir atsiliepimų suvestinė\n/kvietimas – paruošti kvietimą žmonai (persiunčiama nuoroda, jai tik PRADĖTI paspausti)\n/log – veikimo žurnalas (kaip serial)\n/wifireset – pamiršti WiFi tinklą\n/zmona – užregistruoti žmoną ranka\n/adminas – užregistruoti adminą\n/help – ši žinutė", false);
+    TgSendMessage(cid, "Komandos:\n/status – dabartinė būsena\n/statistika – savaitės atsiliepimų suvestinė\n/kvietimas – paruošti kvietimą (persiunčiama nuoroda, gavėjui tik PRADĖTI paspausti)\n/vardas Justina – kaip kreiptis į atsakinėjantį žmogų\n/log – veikimo žurnalas (kaip serial)\n/wifireset – pamiršti WiFi tinklą\n/zmona /adminas – registracija ranka\n/help – ši žinutė", false);
   }
 }
 
@@ -863,10 +924,12 @@ void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
             ApplyFeedback(fb, cid);
           }
           else if (lc.startsWith("/zmona") || (lc.startsWith("/start") && lc.indexOf("zmona") > 0)) {
-            // /zmona ranka ARBA kvietimo nuoroda t.me/<botas>?start=zmona (žmonai - tik PRADĖTI paspausti)
+            // /zmona ranka ARBA kvietimo nuoroda t.me/<botas>?start=zmona (gavėjui - tik PRADĖTI paspausti).
+            // Naujas kvietimas PERIMA registraciją: nuo šiol skaitomi tik naujo žmogaus paspaudimai.
             wife = cid; prefs.putString("chatWife", wife);
-            TgSendMessage(cid, "Sveika! 👗 Čia jūsų šeimos orų stotelė. Vakarais paklausiu, ar tiko apranga - atsakysi vienu mygtuko paspaudimu. Daugiau nieko daryti nereikia 🙂", false);
-            if (admin.length() && admin != cid) TgSendMessage(admin, "✅ Žmona prisijungė - klausimai apie aprangą nuo šiol keliaus jai.", false);
+            String nm = FeedbackName();
+            TgSendMessage(cid, "Labas" + (nm != "žmona" ? (", " + nm) : "") + "! 👋 Čia jūsų šeimos orų stotelė 🌤 Vakarais paklausiu, ar tiko apranga - atsakysi vienu mygtuko paspaudimu. Savaitės suvestinė: /statistika. Daugiau nieko daryti nereikia 🙂", false);
+            if (admin.length() && admin != cid) TgSendMessage(admin, "✅ " + nm + " prisijungė - klausimai apie aprangą ir atsiliepimų registracija nuo šiol jai.", false);
           }
           else if (lc.startsWith("/adminas")) {
             admin = cid; prefs.putString("chatAdmin", admin);
@@ -876,7 +939,8 @@ void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
             admin = cid; prefs.putString("chatAdmin", admin);
             TgSendMessage(cid, "Sveiki! Čia jūsų orų stotelė 🌤 Jūs — administratorius.\nŽmona tegul parašo /zmona.\nKomandos: /status /log /wifireset /help", false);
           }
-          else if (cid == admin && text.startsWith("/")) HandleTgCommand(text, cid); // komandas priima tik adminas
+          else if (cid == admin && text.startsWith("/")) HandleTgCommand(text, cid); // adminui - visos komandos
+          else if (cid == wife && lc.startsWith("/statistika")) TgSendMessage(cid, StatsMessage(), false); // žmonai - statistika
         }
       }
     }
@@ -890,10 +954,12 @@ void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
   // 3. Vakarinis klausimas apie aprangą -> žmonai (jei nustatyta), kitaip adminui (kartą per dieną)
   String askTo = wife.length() ? wife : admin;
   if (askTo.length() && CurrentHour == FeedbackHr && LastAskDay != today) {
-    // Klausime cituojamas rytinis patarimas (kad būtų aišku, KĄ vertinti)
-    String q = "Kaip šiandien tiko apranga pagal mano patarimą? 🙂";
+    // Klausime cituojamas rytinis patarimas (kad būtų aišku, KĄ vertinti) + kreipinys vardu
+    String nm = FeedbackName();
+    String hi = (askTo == wife && nm != "žmona") ? ("Labas, " + nm + "! 🙂 ") : "";
+    String q = hi + "Kaip šiandien tiko apranga pagal mano patarimą?";
     if (prefs.getInt("advDay", -1) == today)
-      q = "Ryte siūliau: " + prefs.getString("advEmo", "") + "\n„" + prefs.getString("advTxt", "")
+      q = hi + "Ryte siūliau: " + prefs.getString("advEmo", "") + "\n„" + prefs.getString("advTxt", "")
         + "\"\n\nKaip tiko? Mygtukai žinutės apačioje 🙂";
     TgSendMessage(askTo, q, true);
     LastAskDay = today; prefs.putInt("lastAsk", today);

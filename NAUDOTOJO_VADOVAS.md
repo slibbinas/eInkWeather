@@ -128,16 +128,24 @@ Atsakyti galima bet kada — stotelė atsakymą pasiims kito pabudimo metu (per 
 
 Parašykite botui komandą — atsakymą gausite per artimiausią pabudimą (iki ~30 min.):
 
-| Komanda | Ką daro |
-|---|---|
-| `/status` | Būsena: laikas, temperatūra, jutiminė, drėgnumas, slėgis, vėjas, baterija, WiFi, korekcija + išvada, atsiliepimų suvestinė, režimas, atmintis |
-| `/log` | Veikimo žurnalas (kaip „serial" nuotoliniu būdu — WiFi, laikas, orų parsisiuntimas) |
-| `/wifireset` | Pamiršta WiFi tinklą ir pasileidžia iš naujo su konfigūravimo portalu |
-| `/adminas` | Užregistruoja siuntėją kaip **adminą** (būsena, baterija) |
-| `/zmona` | Užregistruoja siuntėją kaip **žmoną** (tik klausimas apie aprangą) |
-| `/help` | Komandų sąrašas |
+| Komanda | Kas gali | Ką daro |
+|---|---|---|
+| `/status` | adminas | Būsena: laikas, orai, baterija, WiFi, korekcija + išvada, atsiliepimų suvestinė, režimas |
+| `/statistika` | adminas **ir** žmona | Savaitės atsiliepimų suvestinė: kurią dieną ką paspaudė, sumos, korekcija, išvada |
+| `/kvietimas` | adminas | Paruošia persiunčiamą kvietimą — gavėjui užtenka nuorodos ir PRADĖTI |
+| `/vardas Justina` | adminas | Kaip kreiptis į atsakinėjantį žmogų („Labas, Justina!", statistikoje, kopijose) |
+| `/log` | adminas | Veikimo žurnalas (kaip „serial" nuotoliniu būdu) |
+| `/wifireset` | adminas | Pamiršta WiFi tinklą ir pasileidžia iš naujo |
+| `/zmona` `/adminas` | bet kas | Registracija ranka (paprastai nereikia — naudokite `/kvietimas`) |
+| `/help` | adminas | Komandų sąrašas |
 
-`/status`, `/log`, `/wifireset` priimami tik iš admino telefono.
+**Atsakinėtojo keitimas:** išsiųskite `/kvietimas` kitam žmogui — kas paspaus PRADĖTI, tas
+perima registraciją, ir nuo tada skaitomi tik jo paspaudimai. Nepamirškite atnaujinti
+`/vardas`.
+
+> Valdymas per Telegram turi natūralią specifiką: įrenginys miega, tad komandas jis perskaito
+> **per artimiausią pabudimą** (iki ~30 min.). Norint iškart — spustelkite RESET arba režimo
+> mygtuką: pabudęs įrenginys pirmiausia susitvarko Telegram žinutes.
 
 ### Įjungimas
 
