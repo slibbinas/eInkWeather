@@ -231,7 +231,9 @@ void LoadConfig() { // NVS reikšmės perrašo owm_credentials.h numatytąsias
 // Kiek ms mygtukas laikomas nuspaustas (matuojama iki atleidimo, riba 9 s).
 // <3 s = režimo perjungimas, 3-8 s = nustatymų portalas, >=8 s = OTA įkėlimo režimas.
 unsigned long ButtonHoldMs() {
+  rtc_gpio_deinit((gpio_num_t)BUTTON_1); // grąžinti pin'ą iš RTC (miego žadinimo) į skaitmeninį režimą
   pinMode(BUTTON_1, INPUT_PULLUP);
+  delay(10);                             // pullup nusistovėjimui
   unsigned long start = millis();
   while (digitalRead(BUTTON_1) == LOW) { // aktyvus žemas
     if (millis() - start >= 9000) break;
@@ -416,7 +418,11 @@ void setup() {
     unsigned long held = ButtonHoldMs();
     if      (held >= 8000) StartOtaMode();       // labai ilgas -> OTA įkėlimas per WiFi (baigiasi restart)
     else if (held >= 3000) StartConfigPortal();  // ilgas -> nustatymai (baigiasi restart)
-    else { WifeMode = !WifeMode; prefs.putBool("wifeMode", WifeMode); } // trumpas -> perjungti ir įsiminti
+    else {                                       // trumpas -> perjungti ir įsiminti
+      WifeMode = !WifeMode;
+      prefs.putBool("wifeMode", WifeMode);
+      LOGT("Mygtukas " + String(held) + "ms -> " + (WifeMode ? "zmonos" : "pilnas"));
+    }
   }
   // Mygtukas ar įjungimas -> atnaujinti bet kada; tik planinis (taimerio) žadinimas paiso nakties lango
   bool forceRefresh = (wakeCause != ESP_SLEEP_WAKEUP_TIMER);
