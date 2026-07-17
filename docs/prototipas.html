@@ -65,6 +65,16 @@ h1{font-size:20px;margin:0 0 4px}
 .rose{width:16cqw;height:16cqw;border:2px solid var(--eink-text);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:3.4cqw;margin:1cqw auto}
 .graphs{display:grid;grid-template-columns:repeat(4,1fr);gap:1.5cqw;margin-top:2cqw}
 .graphs>div{border:1px solid var(--eink-line);height:12cqw;font-size:2.2cqw;text-align:center;padding-top:.5cqw;color:var(--eink-muted)}
+.graphs>div{height:auto;padding-bottom:.6cqw}
+.graphs svg{width:100%;height:8cqw;display:block;margin-top:.4cqw}
+.graphs polyline{fill:none;stroke:var(--eink-text);stroke-width:1.6;vector-effect:non-scaling-stroke}
+.graphs rect{fill:var(--eink-text)}
+.graphs .axis{stroke:var(--eink-line);stroke-width:1;vector-effect:non-scaling-stroke}
+.rose-svg{width:15cqw;height:15cqw;display:block;margin:1cqw auto .4cqw}
+.rose-svg circle,.rose-svg line{fill:none;stroke:var(--eink-text);stroke-width:1.2}
+.rose-svg .tick{stroke-width:1.8}
+.rose-svg text{fill:var(--eink-muted);stroke:none;font-size:11px;font-weight:700}
+.rose-svg .needle{fill:var(--eink-text);stroke:none}
 /* techniniai ekranai */
 .center{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;gap:1.6cqw}
 .t1{font-size:4.6cqw;font-weight:700}
@@ -156,12 +166,17 @@ h1{font-size:20px;margin:0 0 4px}
         <!-- PILNAS REŽIMAS -->
         <div class="scr" id="scr-full">
           <div class="fgrid">
-            <div><div class="rose">0.9<br>m/s</div><div class="emu" style="text-align:center">05:04 Saulėtekis<br>21:45 Saulėlydis 🌒</div></div>
+            <div><svg class="rose-svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="47"/><circle cx="50" cy="50" r="45"/><circle cx="50" cy="50" r="32"/><line class="tick" x1="50" y1="3" x2="50" y2="11"/><line class="tick" x1="97" y1="50" x2="89" y2="50"/><line class="tick" x1="50" y1="97" x2="50" y2="89"/><line class="tick" x1="3" y1="50" x2="11" y2="50"/><line class="tick" x1="83.2" y1="16.8" x2="77.5" y2="22.5"/><line class="tick" x1="83.2" y1="83.2" x2="77.5" y2="77.5"/><line class="tick" x1="16.8" y1="83.2" x2="22.5" y2="77.5"/><line class="tick" x1="16.8" y1="16.8" x2="22.5" y2="22.5"/><text x="50" y="21" text-anchor="middle">Š</text><text x="83" y="54" text-anchor="middle">R</text><text x="50" y="90" text-anchor="middle">P</text><text x="17" y="54" text-anchor="middle">V</text><polygon class="needle" points="50,15 55,50 50,45 45,50"/></svg><div class="emu" style="text-align:center;font-size:2.3cqw">0.9 m/s Š<br>05:04 Saulėtekis<br>21:45 Saulėlydis 🌒</div></div>
             <div><span class="eh" style="font-size:5cqw">20.8° &nbsp; 76%</span><br>21° | 21° &nbsp; Debesuota<br><span class="emu">764 mmHg &nbsp; 👁 10 km &nbsp; ☁ 92%</span>
               <div class="emu" style="margin-top:1.5cqw">12:00 ⛅ 15:00 ⛅ 18:00 ⛅ 21:00 ☁ 00:00 ☁ 03:00 🌙</div></div>
             <div style="text-align:center;font-size:9cqw">⛅</div>
           </div>
-          <div class="graphs"><div>Slėgis (mmHg)<br>📈</div><div>Temperatūra (°C)<br>📈</div><div>Lietus (mm)<br>📊</div><div>Drėgnumas (%)<br>📈</div></div>
+          <div class="graphs">
+            <div>Slėgis (mmHg)<svg viewBox="0 0 100 34" preserveAspectRatio="none"><line class="axis" x1="1" y1="32" x2="99" y2="32"/><polyline points="2,20 16,17 30,19 44,12 58,14 72,9 86,13 98,10"/></svg></div>
+            <div>Temperatūra (°C)<svg viewBox="0 0 100 34" preserveAspectRatio="none"><line class="axis" x1="1" y1="32" x2="99" y2="32"/><polyline points="2,27 16,25 30,21 44,16 58,12 72,14 86,18 98,22"/></svg></div>
+            <div>Lietus (mm)<svg viewBox="0 0 100 34" preserveAspectRatio="none"><line class="axis" x1="1" y1="32" x2="99" y2="32"/><rect x="6" y="26" width="7" height="6"/><rect x="20" y="18" width="7" height="14"/><rect x="34" y="28" width="7" height="4"/><rect x="48" y="12" width="7" height="20"/><rect x="62" y="22" width="7" height="10"/><rect x="76" y="29" width="7" height="3"/><rect x="90" y="24" width="7" height="8"/></svg></div>
+            <div>Drėgnumas (%)<svg viewBox="0 0 100 34" preserveAspectRatio="none"><line class="axis" x1="1" y1="32" x2="99" y2="32"/><polyline points="2,13 16,17 30,14 44,19 58,16 72,21 86,18 98,23"/></svg></div>
+          </div>
           <div class="ebar"><span class="eh">Vilnius</span><span>Penktadienis, 17-07-2026 @ 08:31</span><span class="batt">🔋 89% 4.09v&nbsp;&nbsp;📶</span></div>
         </div>
 
@@ -227,7 +242,7 @@ h1{font-size:20px;margin:0 0 4px}
         <button onclick="cmd('statistika')">/statistika</button>
         <button onclick="cmd('vadovas')">/vadovas</button>
         <button onclick="cmd('kvietimas')">/kvietimas</button>
-        <button onclick="cmd('vardas')">/vardas Justina</button>
+        <button onclick="cmd('vardas')">/vardas Griungeldelė</button>
         <button onclick="cmd('log')">/log</button>
         <button onclick="cmd('wifireset')">/wifireset</button>
       </div>
@@ -349,8 +364,8 @@ function statsText(){
     +'\n🧥 Korekcija: '+S.bias.toFixed(1)+'°C\nIšvada: '+$('concl').textContent;
 }
 function cmd(c){
-  if(c==='vardas'){ msg('user','/vardas Justina'); delayNote(); S.name='Justina';
-    msg('bot','Gerai, nuo šiol kreipsiuos: Justina 🙂'); return; }
+  if(c==='vardas'){ msg('user','/vardas Griungeldelė'); delayNote(); S.name='Griungeldelė';
+    msg('bot','Gerai, nuo šiol kreipsiuos: Griungeldelė 🙂'); return; }
   msg('user','/'+c); delayNote();
   if(c==='status')
     msg('bot','📟 Orų stotelė v2.5\n🕐 Penktadienis 08:31\n📍 Vilnius\n🌡 20.8°C (jaučiasi 21.0°)\n💧 76%   764 mmHg\n💨 0.9 m/s P\n🔋 89% (4.09 V)   📶 -61 dBm\n🧥 Korekcija '+S.bias.toFixed(1)+'°C — '+$('concl').textContent+'\n🗳 Atsiliepimai: šalta '+S.hist.filter(x=>x==='FB_COLD').length+' / gerai '+S.hist.filter(x=>x==='FB_OK').length+' / karšta '+S.hist.filter(x=>x==='FB_HOT').length+' / nesilaikyta '+S.hist.filter(x=>x==='FB_SKIP').length+'\n🖥 Režimas: '+(S.mode==='wife'?'paprastas':'pilnas')+'   🧠 180 KB');
