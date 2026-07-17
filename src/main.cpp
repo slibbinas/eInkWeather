@@ -41,7 +41,7 @@
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
-#define FW_VERSION 2             // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
+#define FW_VERSION 3             // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -952,10 +952,24 @@ void HandleTgCommand(const String& text, const String& cid) { // /status, /log, 
   }
   else if (cmd.startsWith("/atnaujinti")) {
     if (GhPat.length() == 0)
-      TgSendMessage(cid, "Atsinaujinimas neįjungtas: per Setup (mygtukas 3-8 s) įveskite GitHub raktą.", false);
+      TgSendMessage(cid, "Atsinaujinimas neįjungtas. Įveskite GitHub raktą: čia komanda /pat github_pat_xxxxx, arba per Setup portalą (mygtukas 3-8 s).", false);
     else {
       UpdRequested = true;
       TgSendMessage(cid, "🔎 Tikrinu, ar yra naujesnė programa (dabar v" + String(FW_VERSION) + ")...", false);
+    }
+  }
+  else if (cmd.startsWith("/pat")) {
+    // GitHub PAT įvedimas iš telefono (alternatyva Setup portalui). Saugom TIK NVS.
+    String v = text.substring(4);
+    v.trim();
+    if (v.length() == 0) {
+      TgSendMessage(cid, "Naudojimas: /pat github_pat_xxxxx\n(fine-grained token, Contents: Read-only, tik eInkWeather repo)", false);
+    } else if (!v.startsWith("github_pat_") && !v.startsWith("ghp_")) {
+      TgSendMessage(cid, "Neatpažintas raktas. Fine-grained PAT prasideda \"github_pat_\". Patikrinkite ir bandykite dar kartą.", false);
+    } else {
+      GhPat = v;
+      prefs.putString("ghPat", v);
+      TgSendMessage(cid, "✅ GitHub raktas išsaugotas. Savarankiškas atnaujinimas įjungtas - bandykite /atnaujinti.\n\n⚠️ Saugumui ištrinkite žinutę su raktu iš šio pokalbio.", false);
     }
   }
   else if (cmd.startsWith("/laikas")) {
@@ -971,7 +985,7 @@ void HandleTgCommand(const String& text, const String& cid) { // /status, /log, 
     else TgSendMessage(cid, "Naudojimas: /laikas 20:00 (valanda 0-23)", false);
   }
   else { // /help, /start ar nežinoma komanda
-    TgSendMessage(cid, "Komandos:\n/status – dabartinė būsena\n/statistika – savaitės atsiliepimų suvestinė\n/vadovas – naudotojo vadovas\n/kvietimas – paruošti kvietimą (persiunčiama nuoroda, gavėjui tik PRADĖTI paspausti)\n/vardas Justina – kaip kreiptis į atsakinėjantį žmogų\n/laikas 20:00 – klausimo apie aprangą valanda\n/ota <raktas> – įjungti OTA įkėlimo režimą\n/atnaujinti – patikrinti ir įdiegti naujausią programą\n/demo – interaktyvaus demo nuoroda\n/log – veikimo žurnalas (kaip serial)\n/zmona /adminas – registracija ranka\n/help – ši žinutė", false);
+    TgSendMessage(cid, "Komandos:\n/status – dabartinė būsena\n/statistika – savaitės atsiliepimų suvestinė\n/vadovas – naudotojo vadovas\n/kvietimas – paruošti kvietimą (persiunčiama nuoroda, gavėjui tik PRADĖTI paspausti)\n/vardas Justina – kaip kreiptis į atsakinėjantį žmogų\n/laikas 20:00 – klausimo apie aprangą valanda\n/ota <raktas> – įjungti OTA įkėlimo režimą\n/atnaujinti – patikrinti ir įdiegti naujausią programą\n/pat <raktas> – įvesti GitHub raktą atsinaujinimui\n/demo – interaktyvaus demo nuoroda\n/log – veikimo žurnalas (kaip serial)\n/zmona /adminas – registracija ranka\n/help – ši žinutė", false);
   }
 }
 
