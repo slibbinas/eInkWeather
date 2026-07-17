@@ -1862,7 +1862,10 @@ void drawStringTop(int x, int yTop, String text, alignment align) {
   get_text_bounds(&currentFont, data, &xx, &yy, &x1, &y1, &w, &h, NULL);
   if (align == RIGHT)  x = x - w;
   if (align == CENTER) x = x - w / 2;
-  int cursor_y = yTop - y1;   // tekstas atsiduria tiksliai [yTop, yTop + h]
+  // Bibliotekos get_char_bounds skaičiuoja "y aukštyn": y2 = baseline + glifo top.
+  // Ekrane (y žemyn) rašalo viršus = baseline - (y1 + h), todėl baseline = yTop + y1 + h.
+  // Patikra 48B "20°": y1=-1, h=72 -> baseline = yTop+71, viršus = baseline-71 = yTop. OK.
+  int cursor_y = yTop + y1 + h;
   write_string(&currentFont, data, &x, &cursor_y, framebuffer);
 }
 
