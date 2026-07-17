@@ -110,6 +110,9 @@ int FbLastDay = -1;                              // paskutinio atsiliepimo diena
 // iš owm_credentials.h, tikrosios užkraunamos iš NVS per LoadConfig().
 String TgToken;      // Telegram bot token (perrašo const telegramBotToken)
 int    FeedbackHr;   // vakarinio klausimo valanda (perrašo const FeedbackHour)
+String OtaKey;       // /ota <raktas> ir paties OTA kanalo slaptažodis (NVS otaKey)
+
+bool OtaRequested = false; // /ota komanda per Telegram: po sync įjungti OTA režimą be mygtuko
 
 // Trumpas veikimo žurnalas - grąžinamas per Telegram komandą /log (kaip serial nuotoliniu būdu)
 String RunLog;
@@ -202,6 +205,7 @@ void LoadConfig() { // NVS reikšmės perrašo owm_credentials.h numatytąsias
   SleepHour  = prefs.getInt("sleepHour",   SleepHour);
   TgToken    = prefs.getString("tgToken",  String(telegramBotToken));
   FeedbackHr = prefs.getInt("fbHour",      FeedbackHour);
+  OtaKey     = prefs.getString("otaKey",   "19750504");
   // Boto pakeitimas: tgOffset ir botUser galioja tik konkrečiam botui - su nauju token'u
   // senas offset tyliai "surytų" visas žinutes, o /kvietimas rodytų seno boto nuorodą.
   if (TgToken.length() && prefs.getString("tgTokUsed", "") != TgToken) {
@@ -271,6 +275,7 @@ void StartConfigPortal() { // blokuojanti; po išsaugojimo įrenginys pasileidž
   // Chat ID paprastai užsiregistruoja automatiškai (/adminas, /zmona), bet galima įvesti/išvalyti ir čia
   WiFiManagerParameter p_adm("chatAdmin", "Admin chat ID (nebūtina)", prefs.getString("chatAdmin", "").c_str(), 24);
   WiFiManagerParameter p_wife("chatWife", "Žmonos chat ID (nebūtina)", prefs.getString("chatWife", "").c_str(), 24);
+  WiFiManagerParameter p_otak("otaKey", "OTA raktas (/ota <raktas>)", OtaKey.c_str(), 16);
   wm.addParameter(&p_api);
   wm.addParameter(&p_city);
   wm.addParameter(&p_country);
@@ -280,6 +285,7 @@ void StartConfigPortal() { // blokuojanti; po išsaugojimo įrenginys pasileidž
   wm.addParameter(&p_fb);
   wm.addParameter(&p_adm);
   wm.addParameter(&p_wife);
+  wm.addParameter(&p_otak);
   cfgSaved = false;
   wm.setSaveParamsCallback(OnSaveConfigParams);
   wm.setShowInfoErase(true); // „Info" puslapyje - mygtukas WiFi nustatymams išvalyti
@@ -297,6 +303,7 @@ void StartConfigPortal() { // blokuojanti; po išsaugojimo įrenginys pasileidž
     prefs.putInt("fbHour",     constrain(atoi(p_fb.getValue()), 0, 23));
     if (strlen(p_adm.getValue()))  prefs.putString("chatAdmin", p_adm.getValue());  // rankinis įvedimas nebūtinas
     if (strlen(p_wife.getValue())) prefs.putString("chatWife",  p_wife.getValue());
+    if (strlen(p_otak.getValue())) prefs.putString("otaKey",    p_otak.getValue());
   }
   ESP.restart(); // nauji nustatymai įsigalioja po perkrovimo
 }
@@ -358,6 +365,7 @@ void StartOtaMode() {
     delay(2000);
     ESP.restart();
   });
+  if (OtaKey.length()) ArduinoOTA.setPassword(OtaKey.c_str()); // apsauga nuo svetimų LAN'e (espota --auth)
   ArduinoOTA.begin();
   pinMode(BUTTON_1, INPUT_PULLUP);
   while (digitalRead(BUTTON_1) == LOW) delay(50); // palaukti, kol atleis 8 s laikytą mygtuką
@@ -445,6 +453,7 @@ void setup() {
       if (RxWeather && RxForecast) { // Only if received both Weather or Forecast proceed
         SaveDailyAdvice();  // Ryto patarimas įsimenamas - vakare Telegram klausime cituojama, kas buvo siūlyta
         TelegramSync();     // Atsakymai, koeficiento korekcija, perspėjimai - kol WiFi dar veikia
+        if (OtaRequested) StartOtaMode(); // /ota per Telegram: WiFi jau gyvas, baigiasi restart'u
         StopWiFi();         // Reduces power consumption
         epd_poweron();      // Switch on EPD display
         epd_clear();        // Clear the screen
@@ -748,8 +757,10 @@ void SendManual(const String& cid) {
     "/status - įrenginio būsena\n"
     "/kvietimas - kvietimas naujam atsakinėtojui (persiųskite; gavėjui tik PRADĖTI paspausti)\n"
     "/vardas Justina - kaip kreiptis į atsakinėtoją\n"
-    "/log - veikimo žurnalas\n"
-    "/wifireset - pamiršti WiFi tinklą\n\n"
+    "/laikas 20:00 - klausimo apie aprangą valanda\n"
+    "/ota <raktas> - įjungti OTA įkėlimo režimą\n"
+    "/log - veikimo žurnalas\n\n"
+    "WiFi pamiršimas - per nustatymų portalą (mygtukas 3-8 s, Info -> Erase).\n"
     "⏱ Įrenginys miega - komandas perskaito per artimiausią pabudimą (iki ~30 min.). "
     "Norite iškart? Spustelkite RESET arba režimo mygtuką.", false);
 }
@@ -890,6 +901,16 @@ void HandleTgCommand(const String& text, const String& cid) { // /status, /log, 
   else if (cmd.startsWith("/vadovas")) {
     SendManual(cid);
   }
+  else if (cmd.startsWith("/ota")) {
+    // Nuotolinis OTA be mygtuko - tik su raktu (numatytasis 19750504, keičiamas per Setup)
+    String key = text.substring(4);
+    key.trim();
+    if (key.length() && key == OtaKey) {
+      OtaRequested = true;
+      TgSendMessage(cid, "🔧 Įjungiu OTA režimą 5 min. Ekrane pamatysite IP ir progreso juostą.\nKompiuteryje: pio run -e ota -t upload\nJei nespėsite - įrenginys pats grįš į darbą, tada /ota dar kartą.", false);
+    }
+    else TgSendMessage(cid, "Naudojimas: /ota <raktas>", false);
+  }
   else if (cmd.startsWith("/vardas")) {
     String name = text.substring(7); // originalus tekstas - išsaugom didžiąsias/lietuviškas raides
     name.trim();
@@ -917,15 +938,20 @@ void HandleTgCommand(const String& text, const String& cid) { // /status, /log, 
     }
     else TgSendMessage(cid, "Nepavyko gauti boto vardo - pabandykite dar kartą kitame cikle.", false);
   }
-  else if (cmd.startsWith("/wifireset")) {
-    TgSendMessage(cid, "🔄 WiFi nustatymai išvalyti. Įrenginys pasileidžia iš naujo ir atidaro „OruStotele-Setup\" portalą (192.168.4.1).", false);
-    WiFiManager wm;
-    wm.resetSettings();
-    delay(1500);
-    ESP.restart();
+  else if (cmd.startsWith("/laikas")) {
+    // Vakarinio klausimo valanda: /laikas 20:00 (minutės ignoruojamos - įrenginys bunda kas 30 min.)
+    String v = text.substring(7);
+    v.trim();
+    int h = (v.length() && isDigit(v[0])) ? v.toInt() : -1;
+    if (h >= 0 && h <= 23) {
+      FeedbackHr = h;
+      prefs.putInt("fbHour", h);
+      TgSendMessage(cid, "Gerai - klausimas apie aprangą bus siunčiamas apie " + String(h) + ":00 (pirmo pabudimo tą valandą metu).", false);
+    }
+    else TgSendMessage(cid, "Naudojimas: /laikas 20:00 (valanda 0-23)", false);
   }
   else { // /help, /start ar nežinoma komanda
-    TgSendMessage(cid, "Komandos:\n/status – dabartinė būsena\n/statistika – savaitės atsiliepimų suvestinė\n/vadovas – naudotojo vadovas\n/kvietimas – paruošti kvietimą (persiunčiama nuoroda, gavėjui tik PRADĖTI paspausti)\n/vardas Justina – kaip kreiptis į atsakinėjantį žmogų\n/log – veikimo žurnalas (kaip serial)\n/wifireset – pamiršti WiFi tinklą\n/zmona /adminas – registracija ranka\n/help – ši žinutė", false);
+    TgSendMessage(cid, "Komandos:\n/status – dabartinė būsena\n/statistika – savaitės atsiliepimų suvestinė\n/vadovas – naudotojo vadovas\n/kvietimas – paruošti kvietimą (persiunčiama nuoroda, gavėjui tik PRADĖTI paspausti)\n/vardas Justina – kaip kreiptis į atsakinėjantį žmogų\n/laikas 20:00 – klausimo apie aprangą valanda\n/ota <raktas> – įjungti OTA įkėlimo režimą\n/log – veikimo žurnalas (kaip serial)\n/zmona /adminas – registracija ranka\n/help – ši žinutė", false);
   }
 }
 
@@ -1194,44 +1220,52 @@ void drawRoundRect(int x, int y, int w, int h, int r) {
   drawArcCorner(x + r,     y + h - r, r, 0.5 * PI, PI);       // a. kairė
 }
 
-// Drabužių piktogramos: (x - centras, y - viršus, s - bazinis plotis). Apvalūs kampai.
-void DrawTShirtIcon(int x, int y, int s) {
-  int bw = s, bh = s * 1.15, sw = s / 3, sh = s / 2, r = s / 7;
-  drawRoundRect(x - bw / 2, y, bw, bh, r);
-  drawRoundRect(x - bw / 2 - sw, y, sw, sh, r / 2); // trumpos rankovės
-  drawRoundRect(x + bw / 2, y, sw, sh, r / 2);
-  drawLine(x - s / 5, y, x, y + s / 6, Black);      // kaklo iškirptė
-  drawLine(x + s / 5, y, x, y + s / 6, Black);
+// --- Drabužių piktogramos: IDENTIŠKOS docs/mockup_zmonos.svg siluetams ---------------------
+// SVG kreivės (tiesės + kvadratiniai Bezier) atkartojamos taškais tame pačiame vienetų tinkle
+// (x -35..35, y 3..58), tik mastelis keičiasi. Storis ~2px (3 poslinkių linijos).
+static float gF; static int gOX, gOY;                 // aktyvios ikonos mastelis ir kilmė
+static void gMap(float x, float y, int &px, int &py) { px = gOX + lroundf(x * gF); py = gOY + lroundf(y * gF); }
+static void gSeg(float x0, float y0, float x1, float y1) {
+  int ax, ay, bx, by; gMap(x0, y0, ax, ay); gMap(x1, y1, bx, by);
+  drawLine(ax, ay, bx, by, Black); drawLine(ax + 1, ay, bx + 1, by, Black); drawLine(ax, ay + 1, bx, by + 1, Black);
+}
+static void gQuad(float x0, float y0, float cx, float cy, float x1, float y1) { // kvadratinis Bezier 8 atkarpomis
+  float px = x0, py = y0;
+  for (int i = 1; i <= 8; i++) {
+    float t = i / 8.0f, u = 1 - t;
+    float x = u * u * x0 + 2 * u * t * cx + t * t * x1, y = u * u * y0 + 2 * u * t * cy + t * t * y1;
+    gSeg(px, py, x, y); px = x; py = y;
+  }
+}
+static void gBegin(int x, int yTop, int s, float unitH) { gF = s / unitH; gOX = x; gOY = yTop - lroundf(3 * gF); }
+
+static void DrawGarmentBody() { // mocko siluetas: tiesūs kraštai, suapvalinti kampai, simetriškas kaklas
+  gSeg(-8, 4, -28, 4);          gQuad(-28, 4, -32, 4, -32, 8);   gSeg(-32, 8, -32, 20);
+  gQuad(-32, 20, -32, 24, -28, 24); gSeg(-28, 24, -24, 24);      gQuad(-24, 24, -20, 24, -19, 20);
+  gSeg(-19, 20, -18, 16);       gSeg(-18, 16, -18, 54);          gQuad(-18, 54, -18, 58, -14, 58);
+  gSeg(-14, 58, 14, 58);        gQuad(14, 58, 18, 58, 18, 54);   gSeg(18, 54, 18, 16);
+  gSeg(18, 16, 19, 20);         gQuad(19, 20, 20, 24, 24, 24);   gSeg(24, 24, 28, 24);
+  gQuad(28, 24, 32, 24, 32, 20); gSeg(32, 20, 32, 8);            gQuad(32, 8, 32, 4, 28, 4);
+  gSeg(28, 4, 8, 4);            gQuad(8, 4, 0, 10, -8, 4);       // kaklo kreivė
 }
 
+void DrawTShirtIcon(int x, int y, int s) { gBegin(x, y, s, 60.0f); DrawGarmentBody(); }
+
 void DrawSweaterIcon(int x, int y, int s) {
-  int bw = s, bh = s * 1.15, sw = s / 3, sh = s * 0.9, r = s / 7;
-  drawRoundRect(x - bw / 2, y, bw, bh, r);
-  drawRoundRect(x - bw / 2 - sw, y, sw, sh, r / 2); // ilgos rankovės
-  drawRoundRect(x + bw / 2, y, sw, sh, r / 2);
-  drawLine(x - s / 5, y, x, y + s / 6, Black);
-  drawLine(x + s / 5, y, x, y + s / 6, Black);
-  for (int row = 0; row < 2; row++) {               // mezgimo bangos
-    int yy = y + s / 2 + row * s / 4;
-    for (int i = 0; i < 3; i++) {
-      int xx = x - 3 * s / 8 + i * s / 4;
-      drawLine(xx, yy, xx + s / 8, yy - s / 12, Black);
-      drawLine(xx + s / 8, yy - s / 12, xx + s / 4, yy, Black);
-    }
+  gBegin(x, y, s, 60.0f); DrawGarmentBody();
+  for (int r = 0; r < 2; r++) {                        // mezgimo bangos (q4 -5 8 0 t8 0 ...)
+    float yy = r ? 43 : 32, sgn = -1;
+    for (int i = 0; i < 4; i++) { float xs = -16 + i * 8; gQuad(xs, yy, xs + 4, yy + 5 * sgn, xs + 8, yy); sgn = -sgn; }
   }
-  for (int i = 1; i < 5; i++)                        // rumbuotas apvadas
-    drawLine(x - bw / 2 + i * bw / 5, y + bh - s / 8, x - bw / 2 + i * bw / 5, y + bh, Black);
+  for (int i = -2; i <= 2; i++) gSeg(i * 6, 52, i * 6, 58); // rumbuotas apvadas
 }
 
 void DrawJacketIcon(int x, int y, int s) {
-  int bw = s, bh = s * 1.15, sw = s / 3, sh = s * 0.9, r = s / 7;
-  drawRoundRect(x - bw / 2, y, bw, bh, r);
-  drawRoundRect(x - bw / 2 - sw, y, sw, sh, r / 2); // ilgos rankovės
-  drawRoundRect(x + bw / 2, y, sw, sh, r / 2);
-  drawLine(x, y + s / 6, x, y + bh, Black);         // užtrauktukas
-  drawLine(x + 1, y + s / 6, x + 1, y + bh, Black);
-  fillTriangle(x - s / 4, y, x - 2, y + s / 6, x - s / 8, y + s / 4, Black); // apykaklės atvartai
-  fillTriangle(x + s / 4, y, x + 2, y + s / 6, x + s / 8, y + s / 4, Black);
+  gBegin(x, y, s, 60.0f); DrawGarmentBody();
+  gSeg(0, 11, 0, 58);                                  // užtrauktukas
+  int a1, a2, b1, b2, c1, c2;                          // apykaklės atvartai (užpildyti, kaip mocke)
+  gMap(-8, 4, a1, a2); gMap(-12, 18, b1, b2); gMap(-4, 13, c1, c2); fillTriangle(a1, a2, b1, b2, c1, c2, Black);
+  gMap( 8, 4, a1, a2); gMap( 12, 18, b1, b2); gMap( 4, 13, c1, c2); fillTriangle(a1, a2, b1, b2, c1, c2, Black);
 }
 
 void DrawHatIcon(int x, int y, int s) {
@@ -1245,19 +1279,20 @@ void DrawHatIcon(int x, int y, int s) {
   fillCircle(x, cy - r - s / 10, s / 10, Black);                     // bumbulas
 }
 
-void DrawUmbrellaIcon(int x, int y, int s) {
-  int r = s / 2 + s / 6;
-  int cy = y + r;
-  for (float ang = PI; ang <= 2 * PI; ang += 0.02) { // kupolas
-    drawPixel(x + r * cos(ang), cy + r * sin(ang), Black);
-    drawPixel(x + r * cos(ang), cy + r * sin(ang) + 1, Black);
+void DrawUmbrellaIcon(int x, int y, int s) { // mocko skėtis: apvalus kupolas, banguotas kraštas, kabliukas
+  gBegin(x, y, s, 72.0f);
+  gOY = y + lroundf(4 * gF);                          // kupolo viršus (unit y=-4) ties yTop
+  float px = -30, py = 26;
+  for (int i = 1; i <= 16; i++) {                     // kupolas - viršutinis puslankis (r=30, centras 0;26)
+    float a = PI + i * (PI / 16.0f);
+    float xx = 30 * cosf(a), yy = 26 + 30 * sinf(a);
+    gSeg(px, py, xx, yy); px = xx; py = yy;
   }
-  drawLine(x - r, cy, x + r, cy, Black);             // apačia
-  drawLine(x, cy - r - 4, x, cy, Black);             // smaigalys ir kotas per kupolą
-  drawLine(x, cy, x, y + s * 1.15, Black);
-  drawLine(x + 1, cy, x + 1, y + s * 1.15, Black);
-  for (float ang = 0; ang <= PI; ang += 0.05)        // rankenos kabliukas
-    drawPixel(x - s / 8 + (s / 8) * cos(ang), y + s * 1.15 + (s / 8) * sin(ang), Black);
+  gQuad(30, 26, 15, 18, 0, 26);                       // banguotas apatinis kraštas
+  gQuad(0, 26, -15, 18, -30, 26);
+  gSeg(0, 26, 0, 60);                                 // kotas
+  gQuad(0, 60, 1, 68, -8, 67);                        // rankenos kabliukas
+  gQuad(-8, 67, -14, 66, -15, 58);
 }
 
 int FindDayPart(int startHour, int endHour) { // artimiausias prognozės įrašas su vietos valanda intervale
@@ -1355,14 +1390,12 @@ void DisplayWifeMode() {
 
   // --- R2: aprangos patarimas (be rėmelio; ikonos kairėje, tekstas fiksuotoje zonoje) ---
   ClothingAdvice adv = GetClothingAdvice();
-  int iy = 194, is_ = 48, ix = 60;                                                    // ikonos 194..249
-  #define DRAW2(FN) do { FN(ix, iy, is_); FN(ix + 1, iy, is_); FN(ix, iy + 1, is_); ix += 92; } while (0) // 3 poslinkiai - tolygus ~2px kontūras, geometrija ta pati
-  if (adv.tshirt)   DRAW2(DrawTShirtIcon);
-  if (adv.sweater)  DRAW2(DrawSweaterIcon);
-  if (adv.jacket)   DRAW2(DrawJacketIcon);
-  if (adv.hat)      DRAW2(DrawHatIcon);
-  if (adv.umbrella) DRAW2(DrawUmbrellaIcon);                                          // skėtis tik kai reikia
-  #undef DRAW2
+  int iy = 194, is_ = 52, ix = 62;                                                    // ikonos 194..250 (mocko siluetai, storis viduje)
+  if (adv.tshirt)   { DrawTShirtIcon(ix, iy, is_);   ix += 92; }
+  if (adv.sweater)  { DrawSweaterIcon(ix, iy, is_);  ix += 92; }
+  if (adv.jacket)   { DrawJacketIcon(ix, iy, is_);   ix += 92; }
+  if (adv.hat)      { DrawHatIcon(ix, iy, is_);      ix += 92; }
+  if (adv.umbrella) { DrawUmbrellaIcon(ix, iy, is_); ix += 92; }                      // skėtis tik kai reikia
   const int tx = 350, tw = 590;                                                       // teksto zona x 350..940
   setFont(&OpenSans8B);
   drawStringTop(tx, 168, "KAIP RENGTIS", LEFT);                                       // 168..188
