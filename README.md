@@ -103,14 +103,14 @@ komanda `/vadovas`).
 
 ## Interaktyvus prototipas
 
-[docs/prototipas.html](docs/prototipas.html) — įrenginio ekrano, mygtuko pakopų (trumpas /
-3–8 s / ≥8 s) ir Telegram grandinės simuliacija naršyklėje: perjunkite režimus, atidarykite
-portalą, paleiskite OTA su progreso juosta, atsakykite į vakarinį klausimą ir stebėkite, kaip
-keičiasi ekranas.
+**▶ Paleisti naršyklėje: <https://tinymakerwifi.com/orai>** — įrenginio ekrano, mygtuko
+pakopų (trumpas / 3–8 s / ≥8 s) ir Telegram grandinės simuliacija: perjunkite režimus,
+atidarykite portalą, paleiskite OTA su progreso juosta, atsakykite į vakarinį klausimą ir
+stebėkite, kaip keičiasi ekranas. Tą pačią nuorodą gauna ir Telegram komanda `/demo`.
 
-> GitHub'e ši nuoroda atidaro failo **kodą** — paleidimui failą reikia atverti naršyklėje:
-> klonavus repo tiesiog dukart spustelėkite `docs\prototipas.html`, arba GitHub'e
-> *…* → *Download* ir atverkite atsisiųstą failą.
+> Šaltinis: [docs/prototipas.html](docs/prototipas.html). GitHub'e ši nuoroda atidaro failo
+> **kodą**, ne paleidžia — paleidimui naudokite viešą nuorodą aukščiau arba dukart spustelėkite
+> `docs\prototipas.html` klonavę repo.
 
 ---
 
@@ -190,9 +190,9 @@ replies on its next wake-up.
 
 Full user manual (in Lithuanian): [NAUDOTOJO_VADOVAS.md](NAUDOTOJO_VADOVAS.md).
 
-**Interactive prototype**: [docs/prototipas.html](docs/prototipas.html) — browser simulation of
-the e-ink screen, the three button-hold tiers and the Telegram feedback loop (download and open
-locally).
+**Interactive prototype** (runs in browser): <https://tinymakerwifi.com/orai> — simulation of
+the e-ink screen, the three button-hold tiers and the Telegram feedback loop. Source:
+[docs/prototipas.html](docs/prototipas.html).
 
 ---
 

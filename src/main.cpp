@@ -20,6 +20,7 @@
 #include <WiFiManager.h>        // https://github.com/tzapu/WiFiManager - AP konfigūravimo portalas
 #include <WiFiClientSecure.h>   // In-built - HTTPS ryšiui su Telegram API
 #include <ArduinoOTA.h>         // In-built - programos įkėlimas per WiFi (be laido)
+#include <Update.h>             // In-built - savarankiškas atsinaujinimas iš GitHub
 #include <Preferences.h>        // In-built - NVS: šalčmyrės koeficientas, Telegram chat ID ir offset
 #include <SPI.h>                // In-built
 #include <time.h>               // In-built
@@ -40,6 +41,7 @@
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
+#define FW_VERSION 2             // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -113,6 +115,8 @@ int    FeedbackHr;   // vakarinio klausimo valanda (perrašo const FeedbackHour)
 String OtaKey;       // /ota <raktas> ir paties OTA kanalo slaptažodis (NVS otaKey)
 
 bool OtaRequested = false; // /ota komanda per Telegram: po sync įjungti OTA režimą be mygtuko
+bool UpdRequested = false; // /atnaujinti komanda: priverstinė naujos versijos patikra šį pabudimą
+String GhPat;              // GitHub fine-grained PAT (tik NVS, į firmware nepatenka!) - atsinaujinimui iš privataus repo
 
 // Trumpas veikimo žurnalas - grąžinamas per Telegram komandą /log (kaip serial nuotoliniu būdu)
 String RunLog;
@@ -206,6 +210,7 @@ void LoadConfig() { // NVS reikšmės perrašo owm_credentials.h numatytąsias
   TgToken    = prefs.getString("tgToken",  String(telegramBotToken));
   FeedbackHr = prefs.getInt("fbHour",      FeedbackHour);
   OtaKey     = prefs.getString("otaKey",   "19750504");
+  GhPat      = prefs.getString("ghPat",    "");
   // Boto pakeitimas: tgOffset ir botUser galioja tik konkrečiam botui - su nauju token'u
   // senas offset tyliai "surytų" visas žinutes, o /kvietimas rodytų seno boto nuorodą.
   if (TgToken.length() && prefs.getString("tgTokUsed", "") != TgToken) {
@@ -276,6 +281,7 @@ void StartConfigPortal() { // blokuojanti; po išsaugojimo įrenginys pasileidž
   WiFiManagerParameter p_adm("chatAdmin", "Admin chat ID (nebūtina)", prefs.getString("chatAdmin", "").c_str(), 24);
   WiFiManagerParameter p_wife("chatWife", "Žmonos chat ID (nebūtina)", prefs.getString("chatWife", "").c_str(), 24);
   WiFiManagerParameter p_otak("otaKey", "OTA raktas (/ota <raktas>)", OtaKey.c_str(), 16);
+  WiFiManagerParameter p_gh("ghPat", "GitHub raktas atsinaujinimui (PAT, nebūtina)", GhPat.c_str(), 100);
   wm.addParameter(&p_api);
   wm.addParameter(&p_city);
   wm.addParameter(&p_country);
@@ -286,6 +292,7 @@ void StartConfigPortal() { // blokuojanti; po išsaugojimo įrenginys pasileidž
   wm.addParameter(&p_adm);
   wm.addParameter(&p_wife);
   wm.addParameter(&p_otak);
+  wm.addParameter(&p_gh);
   cfgSaved = false;
   wm.setSaveParamsCallback(OnSaveConfigParams);
   wm.setShowInfoErase(true); // „Info" puslapyje - mygtukas WiFi nustatymams išvalyti
@@ -304,6 +311,7 @@ void StartConfigPortal() { // blokuojanti; po išsaugojimo įrenginys pasileidž
     if (strlen(p_adm.getValue()))  prefs.putString("chatAdmin", p_adm.getValue());  // rankinis įvedimas nebūtinas
     if (strlen(p_wife.getValue())) prefs.putString("chatWife",  p_wife.getValue());
     if (strlen(p_otak.getValue())) prefs.putString("otaKey",    p_otak.getValue());
+    if (strlen(p_gh.getValue()))   prefs.putString("ghPat",     p_gh.getValue());
   }
   ESP.restart(); // nauji nustatymai įsigalioja po perkrovimo
 }
@@ -454,6 +462,7 @@ void setup() {
         SaveDailyAdvice();  // Ryto patarimas įsimenamas - vakare Telegram klausime cituojama, kas buvo siūlyta
         TelegramSync();     // Atsakymai, koeficiento korekcija, perspėjimai - kol WiFi dar veikia
         if (OtaRequested) StartOtaMode(); // /ota per Telegram: WiFi jau gyvas, baigiasi restart'u
+        SelfUpdateCheck(UpdRequested);    // kartą per parą / po RESET / per /atnaujinti (radus - restart)
         StopWiFi();         // Reduces power consumption
         epd_poweron();      // Switch on EPD display
         epd_clear();        // Clear the screen
@@ -938,6 +947,17 @@ void HandleTgCommand(const String& text, const String& cid) { // /status, /log, 
     }
     else TgSendMessage(cid, "Nepavyko gauti boto vardo - pabandykite dar kartą kitame cikle.", false);
   }
+  else if (cmd.startsWith("/demo")) {
+    TgSendMessage(cid, "🖥 Interaktyvus stotelės demo naršyklėje:\nhttps://tinymakerwifi.com/orai", false);
+  }
+  else if (cmd.startsWith("/atnaujinti")) {
+    if (GhPat.length() == 0)
+      TgSendMessage(cid, "Atsinaujinimas neįjungtas: per Setup (mygtukas 3-8 s) įveskite GitHub raktą.", false);
+    else {
+      UpdRequested = true;
+      TgSendMessage(cid, "🔎 Tikrinu, ar yra naujesnė programa (dabar v" + String(FW_VERSION) + ")...", false);
+    }
+  }
   else if (cmd.startsWith("/laikas")) {
     // Vakarinio klausimo valanda: /laikas 20:00 (minutės ignoruojamos - įrenginys bunda kas 30 min.)
     String v = text.substring(7);
@@ -951,7 +971,7 @@ void HandleTgCommand(const String& text, const String& cid) { // /status, /log, 
     else TgSendMessage(cid, "Naudojimas: /laikas 20:00 (valanda 0-23)", false);
   }
   else { // /help, /start ar nežinoma komanda
-    TgSendMessage(cid, "Komandos:\n/status – dabartinė būsena\n/statistika – savaitės atsiliepimų suvestinė\n/vadovas – naudotojo vadovas\n/kvietimas – paruošti kvietimą (persiunčiama nuoroda, gavėjui tik PRADĖTI paspausti)\n/vardas Justina – kaip kreiptis į atsakinėjantį žmogų\n/laikas 20:00 – klausimo apie aprangą valanda\n/ota <raktas> – įjungti OTA įkėlimo režimą\n/log – veikimo žurnalas (kaip serial)\n/zmona /adminas – registracija ranka\n/help – ši žinutė", false);
+    TgSendMessage(cid, "Komandos:\n/status – dabartinė būsena\n/statistika – savaitės atsiliepimų suvestinė\n/vadovas – naudotojo vadovas\n/kvietimas – paruošti kvietimą (persiunčiama nuoroda, gavėjui tik PRADĖTI paspausti)\n/vardas Justina – kaip kreiptis į atsakinėjantį žmogų\n/laikas 20:00 – klausimo apie aprangą valanda\n/ota <raktas> – įjungti OTA įkėlimo režimą\n/atnaujinti – patikrinti ir įdiegti naujausią programą\n/demo – interaktyvaus demo nuoroda\n/log – veikimo žurnalas (kaip serial)\n/zmona /adminas – registracija ranka\n/help – ši žinutė", false);
   }
 }
 
@@ -1011,6 +1031,7 @@ void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
           else if (cid == admin && text.startsWith("/")) HandleTgCommand(text, cid); // adminui - visos komandos
           else if (cid == wife && lc.startsWith("/statistika")) TgSendMessage(cid, StatsMessage(), false); // žmonai - statistika
           else if (cid == wife && lc.startsWith("/vadovas")) SendManual(cid);                              // žmonai - vadovas
+          else if (cid == wife && lc.startsWith("/demo")) TgSendMessage(cid, "🖥 Interaktyvus stotelės demo naršyklėje:\nhttps://tinymakerwifi.com/orai", false);
         }
       }
     }
@@ -1104,6 +1125,99 @@ void TelegramTestMode() {
   epd_poweroff_all();
   delay(3000);
   ESP.restart();
+}
+
+//################ SAVARANKIŠKAS ATSINAUJINIMAS IŠ GITHUB #################################
+// Tikrina firmware/version.txt privačiame repo (per fine-grained PAT iš NVS - raktas į
+// firmware NEpatenka). Radus naujesnę - siunčia firmware/firmware.bin į NEAKTYVŲ OTA
+// skirsnį (Update.h; veikianti versija nepaliečiama iki restarto), progresas ekrane.
+// Kada: kartą per parą + po RESET/įjungimo + /atnaujinti. NE kas 30 min. (baterija).
+
+static bool GhGet(HTTPClient &https, WiFiClientSecure &client, const char* path) {
+  if (!https.begin(client, String("https://api.github.com/repos/slibbinas/eInkWeather/contents/") + path)) return false;
+  https.addHeader("Authorization", "Bearer " + GhPat);
+  https.addHeader("Accept", "application/vnd.github.raw");
+  https.addHeader("User-Agent", "OruStotele");
+  https.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+  return true;
+}
+
+void SelfUpdateCheck(bool force) {
+  if (GhPat.length() == 0) return;                       // funkcija įjungiama įvedus PAT per Setup
+  int today = (int)(time(NULL) / 86400);
+  bool coldBoot = (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_UNDEFINED);
+  if (!force && !coldBoot && prefs.getInt("updDay", -1) == today) return;
+  prefs.putInt("updDay", today);
+  // 1. Versijos patikra
+  WiFiClientSecure c1; c1.setInsecure();
+  HTTPClient hv; hv.setTimeout(15000);
+  if (!GhGet(hv, c1, "firmware/version.txt")) return;
+  int code = hv.GET();
+  String v = (code == 200) ? hv.getString() : "";
+  hv.end();
+  v.trim();
+  if (code != 200) { LOGT("UPD ver HTTP " + String(code)); return; }
+  int remote = v.toInt();
+  if (remote <= FW_VERSION) { DBG("UPD naujausia"); return; }
+  LOGT("UPD v" + String(FW_VERSION) + " -> v" + String(remote));
+  String admin = prefs.getString("chatAdmin", "");
+  if (admin.length()) TgSendMessage(admin, "🔄 Radau atnaujinimą v" + String(remote) + " - diegiu (progresas ekrane)...", false);
+  // 2. Ekranas su progreso juosta
+  epd_poweron();
+  ClearScreen();
+  setFont(&OpenSans18B);
+  drawStringTop(SCREEN_WIDTH / 2, 120, "Atsinaujinu: v" + String(FW_VERSION) + " -> v" + String(remote), CENTER);
+  setFont(&OpenSans12B);
+  drawStringTop(SCREEN_WIDTH / 2, 200, "Siunčiuosi programą iš GitHub...", CENTER);
+  drawRect(OTA_BAR_X - 3, OTA_BAR_Y - 3, OTA_BAR_W + 6, OTA_BAR_H + 6, Black);
+  drawRect(OTA_BAR_X - 2, OTA_BAR_Y - 2, OTA_BAR_W + 4, OTA_BAR_H + 4, Black);
+  edp_update();
+  // 3. Siuntimas į neaktyvų OTA skirsnį
+  WiFiClientSecure c2; c2.setInsecure();
+  HTTPClient dl; dl.setTimeout(30000);
+  bool ok = false;
+  if (GhGet(dl, c2, "firmware/firmware.bin")) {
+    code = dl.GET();
+    int len = dl.getSize();
+    if (code == 200 && len > 0 && Update.begin(len)) {
+      WiFiClient *stream = dl.getStreamPtr();
+      uint8_t buf[2048];
+      int done = 0, barPx = 0;
+      unsigned long start = millis();
+      while (done < len && millis() - start < 180000UL) { // 3 min apsauga
+        size_t avail = stream->available();
+        if (avail) {
+          int r = stream->readBytes(buf, avail > sizeof(buf) ? sizeof(buf) : avail);
+          if (Update.write(buf, r) != (size_t)r) break;
+          done += r;
+          int px = (int)((uint64_t)done * OTA_BAR_W / len);
+          if (px - barPx >= 12) {                          // dalinis atnaujinimas, be pilno refresh
+            Rect_t rr = { OTA_BAR_X + barPx, OTA_BAR_Y, px - barPx, OTA_BAR_H };
+            for (int i = 0; i < 3; i++) epd_push_pixels(rr, 50, 0);
+            barPx = px;
+          }
+        }
+        else delay(5);
+        yield();                                           // watchdog'ui
+      }
+      ok = (done == len) && Update.end(true);
+      if (!ok) { Update.abort(); LOGT("UPD siuntimo klaida @" + String(done) + "/" + String(len)); }
+    }
+    else LOGT("UPD bin HTTP " + String(code) + " len " + String(len));
+    dl.end();
+  }
+  // 4. Rezultatas
+  fillRect(0, 396, SCREEN_WIDTH, 144, White);
+  setFont(&OpenSans18B);
+  drawStringTop(SCREEN_WIDTH / 2, 420, ok ? "Įdiegta! Perkraunama..." : "Nepavyko - lieka sena versija", CENTER);
+  edp_update();
+  epd_poweroff_all();
+  if (ok) {
+    if (admin.length()) TgSendMessage(admin, "✅ Atsinaujinau į v" + String(remote) + " - persikraunu.", false);
+    delay(500);
+    ESP.restart();
+  }
+  else if (admin.length()) TgSendMessage(admin, "⚠️ Atnaujinti nepavyko (žr. /log) - veikiu su v" + String(FW_VERSION) + ".", false);
 }
 
 //################ PAPRASTASIS ("ŽMONOS") REŽIMAS ########################################

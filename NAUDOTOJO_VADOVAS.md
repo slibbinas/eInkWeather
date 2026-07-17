@@ -137,10 +137,14 @@ Parašykite botui komandą — atsakymą gausite per artimiausią pabudimą (iki
 |---|---|---|
 | `/status` | adminas | Būsena: laikas, orai, baterija, WiFi, korekcija + išvada, atsiliepimų suvestinė, režimas |
 | `/statistika` | adminas **ir** žmona | Savaitės atsiliepimų suvestinė: kurią dieną ką paspaudė, sumos, korekcija, išvada |
+| `/vadovas` | adminas **ir** žmona | Šis naudotojo vadovas Telegram chat'e |
+| `/demo` | adminas **ir** žmona | Interaktyvaus prototipo nuoroda naršyklėje (<https://tinymakerwifi.com/orai>) |
+| `/atnaujinti` | adminas | Patikrina git ir įsidiegia naujausią firmware (savarankiškas OTA) |
+| `/laikas HH:MM` | adminas | Nustato vakarinio klausimo laiką |
+| `/ota 19750504` | adminas | Įjungia OTA režimą laidiniam/belaidžiam kėlimui (raktas — nustatomas portale) |
 | `/kvietimas` | adminas | Paruošia persiunčiamą kvietimą — gavėjui užtenka nuorodos ir PRADĖTI |
 | `/vardas Justina` | adminas | Kaip kreiptis į atsakinėjantį žmogų („Labas, Justina!", statistikoje, kopijose) |
 | `/log` | adminas | Veikimo žurnalas (kaip „serial" nuotoliniu būdu) |
-| `/wifireset` | adminas | Pamiršta WiFi tinklą ir pasileidžia iš naujo |
 | `/zmona` `/adminas` | bet kas | Registracija ranka (paprastai nereikia — naudokite `/kvietimas`) |
 | `/help` | adminas | Komandų sąrašas |
 
