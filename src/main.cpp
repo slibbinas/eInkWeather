@@ -19,6 +19,7 @@
 #include <WiFi.h>               // In-built
 #include <WiFiManager.h>        // https://github.com/tzapu/WiFiManager - AP konfigūravimo portalas
 #include <WiFiClientSecure.h>   // In-built - HTTPS ryšiui su Telegram API
+#include <ArduinoOTA.h>         // In-built - programos įkėlimas per WiFi (be laido)
 #include <Preferences.h>        // In-built - NVS: šalčmyrės koeficientas, Telegram chat ID ir offset
 #include <SPI.h>                // In-built
 #include <time.h>               // In-built
@@ -227,14 +228,16 @@ void LoadConfig() { // NVS reikšmės perrašo owm_credentials.h numatytąsias
   FeedbackHr = prefs.getInt("fbHour",      FeedbackHour);
 }
 
-bool ButtonHeldLong() { // true, jei mygtukas laikomas ilgiau nei 3 s (konfigūracijos režimas)
+// Kiek ms mygtukas laikomas nuspaustas (matuojama iki atleidimo, riba 9 s).
+// <3 s = režimo perjungimas, 3-8 s = nustatymų portalas, >=8 s = OTA įkėlimo režimas.
+unsigned long ButtonHoldMs() {
   pinMode(BUTTON_1, INPUT_PULLUP);
   unsigned long start = millis();
   while (digitalRead(BUTTON_1) == LOW) { // aktyvus žemas
-    if (millis() - start > 3000) return true;
+    if (millis() - start >= 9000) break;
     delay(50);
   }
-  return false;
+  return millis() - start;
 }
 
 static bool cfgSaved = false;
@@ -305,6 +308,69 @@ void StartConfigPortal() { // blokuojanti; po išsaugojimo įrenginys pasileidž
   ESP.restart(); // nauji nustatymai įsigalioja po perkrovimo
 }
 
+//################ OTA ĮKĖLIMAS PER WIFI (be laido) #####################################
+// Įjungiama palaikius mygtuką >=8 s. Ekrane rodomas IP ir progreso juosta; kompiuteryje
+// įkeliama komanda: pio run -e ota -t upload (arba --upload-port <IP iš ekrano>).
+// Progresas piešiamas epd_push_pixels - daliniu atnaujinimu, be lėto pilno refresh'o.
+
+static int OtaBarPx = 0;                       // kiek progreso juostos jau užpildyta (px)
+const int OTA_BAR_X = 183, OTA_BAR_Y = 334, OTA_BAR_W = 594, OTA_BAR_H = 32;
+
+void StartOtaMode() {
+  if (StartWiFi() != WL_CONNECTED) {
+    epd_poweron(); epd_clear();
+    setFont(&OpenSans18B);
+    drawStringTop(SCREEN_WIDTH / 2, 240, "OTA: nepavyko prisijungti prie WiFi", CENTER);
+    edp_update(); epd_poweroff_all();
+    delay(3000);
+    ESP.restart();
+  }
+  epd_poweron();
+  epd_clear();
+  setFont(&OpenSans18B);
+  drawStringTop(SCREEN_WIDTH / 2, 80, "OTA įkėlimo režimas", CENTER);
+  setFont(&OpenSans12B);
+  drawStringTop(SCREEN_WIDTH / 2, 160, "Laukiu programos per WiFi (5 min.)", CENTER);
+  drawStringTop(SCREEN_WIDTH / 2, 200, "Kompiuteryje: pio run -e ota -t upload", CENTER);
+  drawStringTop(SCREEN_WIDTH / 2, 240, "Adresas: " + WiFi.localIP().toString() + "  (orustotele.local)", CENTER);
+  drawRect(OTA_BAR_X - 3, OTA_BAR_Y - 3, OTA_BAR_W + 6, OTA_BAR_H + 6, Black); // juostos rėmelis
+  drawRect(OTA_BAR_X - 2, OTA_BAR_Y - 2, OTA_BAR_W + 4, OTA_BAR_H + 4, Black);
+  edp_update();                                // ekranas lieka įjungtas progreso piešimui
+  OtaBarPx = 0;
+  ArduinoOTA.setHostname("orustotele");
+  ArduinoOTA.onProgress([](unsigned int cur, unsigned int total) {
+    if (!total) return;
+    int px = (int)((uint64_t)cur * OTA_BAR_W / total);
+    if (px - OtaBarPx >= 12 || (px == OTA_BAR_W && px != OtaBarPx)) { // piešiam kas ~2%
+      Rect_t r = { OTA_BAR_X + OtaBarPx, OTA_BAR_Y, px - OtaBarPx, OTA_BAR_H };
+      for (int i = 0; i < 3; i++) epd_push_pixels(r, 50, 0); // 3 impulsai - sodrus juodumas
+      OtaBarPx = px;
+    }
+  });
+  ArduinoOTA.onEnd([]() {
+    setFont(&OpenSans18B);
+    drawStringTop(SCREEN_WIDTH / 2, 410, "Įkelta! Perkraunama...", CENTER);
+    edp_update();
+    epd_poweroff_all();                        // po šio callback'o ArduinoOTA pats perkrauna
+  });
+  ArduinoOTA.onError([](ota_error_t e) {
+    setFont(&OpenSans18B);
+    drawStringTop(SCREEN_WIDTH / 2, 410, "OTA klaida " + String((int)e) + " - perkraunama", CENTER);
+    edp_update();
+    epd_poweroff_all();
+    delay(2000);
+    ESP.restart();
+  });
+  ArduinoOTA.begin();
+  unsigned long start = millis();
+  while (millis() - start < 5UL * 60UL * 1000UL) { // 5 min langas
+    ArduinoOTA.handle();
+    delay(10);
+  }
+  epd_poweroff_all();                          // niekas neatsiuntė - grįžtam į įprastą darbą
+  ESP.restart();
+}
+
 void InitialiseSystem() {
   StartTime = millis();
   #ifdef SERIAL_DEBUG 
@@ -340,7 +406,9 @@ void setup() {
   FbLastDay = prefs.getInt("fbLast", -1);
   esp_sleep_wakeup_cause_t wakeCause = esp_sleep_get_wakeup_cause();
   if (wakeCause == ESP_SLEEP_WAKEUP_EXT0) {
-    if (ButtonHeldLong()) StartConfigPortal();   // ilgas paspaudimas -> nustatymai (ir restart)
+    unsigned long held = ButtonHoldMs();
+    if      (held >= 8000) StartOtaMode();       // labai ilgas -> OTA įkėlimas per WiFi (baigiasi restart)
+    else if (held >= 3000) StartConfigPortal();  // ilgas -> nustatymai (baigiasi restart)
     else { WifeMode = !WifeMode; prefs.putBool("wifeMode", WifeMode); } // trumpas -> perjungti ir įsiminti
   }
   // Mygtukas ar įjungimas -> atnaujinti bet kada; tik planinis (taimerio) žadinimas paiso nakties lango

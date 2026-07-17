@@ -72,7 +72,8 @@ mokosi iš jūsų atsakymų Telegram'e (žr. 6 skyrių).
 
 Visus nustatymus galima pakeisti telefonu, nieko neredaguojant kode:
 
-1. **Palaikykite plokštės mygtuką nuspaustą ~3 sekundes** (ne RESET). Ekrane pasirodys
+1. **Palaikykite plokštės mygtuką nuspaustą ~3 sekundes ir atleiskite** (ne RESET; laikant
+   ilgiau nei 8 s įsijungs OTA įkėlimo režimas — žr. 9 skyrių). Ekrane pasirodys
    „Nustatymų režimas" su instrukcijomis.
 2. Telefonu prisijunkite prie WiFi tinklo **`OruStotele-Setup`** ir naršyklėje atidarykite
    **`192.168.4.1`**.
@@ -181,6 +182,18 @@ Parašykite botui komandą — atsakymą gausite per artimiausią pabudimą (iki
 - Miestas, laiko juosta, kalba, klausimo valanda (`FeedbackHour`) — tame pačiame faile.
 - Miego intervalas ir veikimo langas — `SleepDuration`, `WakeupHour`, `SleepHour`
   failo `src/main.cpp` viršuje.
+
+### Programos įkėlimas per WiFi (OTA, be laido)
+
+1. Įrenginyje **palaikykite mygtuką ~8 sekundes** (ilgiau nei nustatymų portalui).
+   Ekrane pasirodys **„OTA įkėlimo režimas"** su įrenginio IP adresu ir tuščia progreso juosta.
+2. Kompiuteryje (tame pačiame WiFi tinkle): `pio run -e ota -t upload`
+   (jei `orustotele.local` vardas nesurandamas — `pio run -e ota -t upload --upload-port <IP iš ekrano>`).
+3. Įkėlimo eiga rodoma **progreso juosta ekrane**; pabaigoje — „Įkelta! Perkraunama...".
+   Jei per 5 min. niekas neįkeliama, įrenginys pats grįžta į įprastą darbą.
+
+Mygtuko laikymo pakopos: **trumpai** — perjungti režimą · **~3 s** — nustatymų portalas ·
+**~8 s** — OTA įkėlimas.
 
 ### Derinimas
 - Atkomentuokite `#define SERIAL_DEBUG` `src/main.cpp` viršuje → pranešimai per USB

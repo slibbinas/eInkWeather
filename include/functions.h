@@ -51,6 +51,7 @@ void DrawRSSI(int x, int y, int rssi);
 void DrawBattery(int x, int y);
 void ReadBattery();
 void TelegramSync();
+void StartOtaMode();
 void DisplayForecastWeather(int x, int y, int index);
 void DisplayAstronomySection(int x, int y);
 void DisplayForecastSection(int x, int y);
