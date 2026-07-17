@@ -221,16 +221,23 @@ h1{font-size:20px;margin:0 0 4px}
         <button onclick="reply('FB_SKIP')">🤷 Nesilaikiau</button>
       </div>
       <div class="chat-tools">
-        <button onclick="simEvening()">⏰ Simuliuoti vakarinį klausimą (20:00)</button>
-        <button onclick="simBattery()">🪫 Simuliuoti baterijos perspėjimą</button>
-        <button onclick="cmdStatus()">/status</button>
+        <button onclick="simEvening()">⏰ Vakarinis klausimas</button>
+        <button onclick="simBattery()">🪫 Baterija 9%</button>
+        <button onclick="cmd('status')">/status</button>
+        <button onclick="cmd('statistika')">/statistika</button>
+        <button onclick="cmd('vadovas')">/vadovas</button>
+        <button onclick="cmd('kvietimas')">/kvietimas</button>
+        <button onclick="cmd('vardas')">/vardas Justina</button>
+        <button onclick="cmd('log')">/log</button>
+        <button onclick="cmd('wifireset')">/wifireset</button>
       </div>
     </div>
   </div>
 </div>
 
 <script>
-const S = { mode:'wife', state:'sleep', otaTimer:null };
+const S = { mode:'wife', state:'sleep', otaTimer:null,
+            name:'žmona', bias:-2.0, hist:[], delayNoted:false }; // Telegram simuliacijos būsena
 const $ = id => document.getElementById(id);
 const screen = $('screen');
 const FB = {FB_COLD:'buvo šalta 🥶', FB_OK:'kaip tik 👍', FB_HOT:'buvo karšta 🥵', FB_SKIP:'nesilaikė patarimo 🤷'};
@@ -297,7 +304,8 @@ function startTgTest(){
 }
 function simEvening(){
   awaiting='evening'; kb(true);
-  msg('bot','Ryte siūliau: 👕🧶\n„Megztinio diena: nei šalta, nei karšta — kaip tik. Po pietų iki 24° — renkis sluoksniais"\n\nKaip tiko? Mygtukai žinutės apačioje 🙂');
+  const hi = S.name!=='žmona' ? ('Labas, '+S.name+'! 🙂 ') : '';
+  msg('bot', hi+'Ryte siūliau: 👕👚\n„Megztinio diena: nei šalta, nei karšta — kaip tik. Po pietų iki 24° — renkis sluoksniais"\n\nKaip tiko? Mygtukai žinutės apačioje 🙂');
 }
 function reply(code){
   if(!awaiting) return;
@@ -311,18 +319,60 @@ function reply(code){
     return;
   }
   msg('bot', FBREPLY[code]);
-  msg('note','→ adminui: 👗 Žmona atsakė: '+FB[code]);
+  msg('note','→ adminui: 👗 '+S.name+' atsakė: '+FB[code]);
+  if(code==='FB_COLD') S.bias=Math.max(-5,S.bias-0.5);
+  if(code==='FB_HOT')  S.bias=Math.min(1,S.bias+0.5);
+  S.hist.push(code);
   $('fbdate').textContent='07-17';
   if(code==='FB_COLD') $('concl').textContent='Dažniau jaučiate šaltį — renku šilčiau 🧣';
   if(code==='FB_HOT')  $('concl').textContent='Mėgstate lengviau — renku vėsiau 😎';
   if(code==='FB_OK')   $('concl').textContent='Patarimai gerai pritaikyti 🎯';
   if(code==='FB_SKIP') $('concl').textContent='Dažnai nesilaikote patarimų 🙂';
   awaiting=null;
-  setHint('Atsakymas užskaitytas: koeficientas ir ekrano „atsakyta"/išvada atsinaujino (realiai — per ~30 min.).');
+  setHint('Atsakymas užskaitytas: koeficientas ('+S.bias.toFixed(1)+'°) ir ekrano išvada atsinaujino (realiai — per ~30 min.).');
 }
 function simBattery(){ msg('bot','🪫 Baterija liko 9% (3.42 V) - laikas pakrauti!'); msg('note','(siunčiama tik adminui, kartą per dieną)'); }
-function cmdStatus(){ msg('user','/status');
-  msg('bot','📟 Orų stotelė v2.5\n🕐 Penktadienis 08:31\n📍 Vilnius\n🌡 20.8°C (jaučiasi 21.0°)\n💧 76%   764 mmHg\n💨 0.9 m/s P\n🔋 89% (4.09 V)   📶 -61 dBm\n🧥 Korekcija -2.0°C — renkuosi patarimus\n🗳 Atsiliepimai: šalta 0 / gerai 0 / karšta 0 / nesilaikyta 0\n🖥 Režimas: žmonos   🧠 180 KB'); }
+
+/* --- Komandų simuliacija --- */
+function delayNote(){
+  if(S.delayNoted) return;
+  S.delayNoted=true;
+  msg('note','⏱ Realybėje botas atsako per artimiausią įrenginio pabudimą (iki ~30 min.), nes stotelė miega. Prototipe — iškart.');
+}
+function statsText(){
+  const days=['Pn','An','Tr','Kt','Pn','Št','Sk'];
+  let n={FB_COLD:0,FB_HOT:0,FB_OK:0,FB_SKIP:0}, lines='';
+  S.hist.forEach((c,i)=>{ n[c]++; lines+=days[i%7]+' 07-'+(11+i)+': '+FB[c]+'\n'; });
+  return '📊 Savaitės statistika ('+S.name+')\n'
+    +(lines||'Šią savaitę atsiliepimų dar nebuvo.\n')
+    +'\nIš viso: 👍 '+n.FB_OK+' · 🥶 '+n.FB_COLD+' · 🥵 '+n.FB_HOT+' · 🤷 '+n.FB_SKIP
+    +'\n🧥 Korekcija: '+S.bias.toFixed(1)+'°C\nIšvada: '+$('concl').textContent;
+}
+function cmd(c){
+  if(c==='vardas'){ msg('user','/vardas Justina'); delayNote(); S.name='Justina';
+    msg('bot','Gerai, nuo šiol kreipsiuos: Justina 🙂'); return; }
+  msg('user','/'+c); delayNote();
+  if(c==='status')
+    msg('bot','📟 Orų stotelė v2.5\n🕐 Penktadienis 08:31\n📍 Vilnius\n🌡 20.8°C (jaučiasi 21.0°)\n💧 76%   764 mmHg\n💨 0.9 m/s P\n🔋 89% (4.09 V)   📶 -61 dBm\n🧥 Korekcija '+S.bias.toFixed(1)+'°C — '+$('concl').textContent+'\n🗳 Atsiliepimai: šalta '+S.hist.filter(x=>x==='FB_COLD').length+' / gerai '+S.hist.filter(x=>x==='FB_OK').length+' / karšta '+S.hist.filter(x=>x==='FB_HOT').length+' / nesilaikyta '+S.hist.filter(x=>x==='FB_SKIP').length+'\n🖥 Režimas: '+(S.mode==='wife'?'paprastas':'pilnas')+'   🧠 180 KB');
+  else if(c==='statistika') msg('bot', statsText());
+  else if(c==='vadovas'){
+    msg('bot','📖 ORŲ STOTELĖS VADOVAS (1/2)\n\n🔄 Kasdienis ciklas:\n• Ryte stotelė įsimena dienos aprangos patarimą\n• Vakare atsakinėtoja gauna klausimą su 4 mygtukais\n• Vienas paspaudimas - atsakymas užskaitytas\n• Adminas gauna atsakymo kopiją\n\n🔘 Mygtukas: trumpai - ekranas · 3-8 s - portalas · 8+ s - OTA · RESET - perkrauti');
+    msg('bot','📖 VADOVAS (2/2) - komandos\n\nAbiem: /statistika /vadovas\nAdminui: /status /kvietimas /vardas /log /wifireset\n\n⏱ Įrenginys miega - komandas perskaito per ≤30 min.');
+  }
+  else if(c==='kvietimas'){
+    msg('bot','Persiųskite žmonai šią žinutę 👇 (ilgai palaikykite ant jos -> Forward)');
+    msg('bot','Sveika! Čia mūsų orų stotelė 🌤 Ji vakarais paklaus, ar tiko apranga.\nPaspausk nuorodą ir tada mygtuką PRADĖTI - daugiau nieko daryti nereikia:\nhttps://t.me/OruStoteleBot?start=zmona');
+    setTimeout(()=>{ msg('note','👗 '+S.name+' paspaudė PRADĖTI...');
+      msg('bot','✅ '+S.name+' prisijungė - klausimai apie aprangą ir atsiliepimų registracija nuo šiol jai.'); }, 2500);
+  }
+  else if(c==='log')
+    msg('bot','🧾 Žurnalas:\nWiFi OK 192.168.1.105 RSSI=-61\nLaikas Penktadienis 08:31\nOrai w=1 f=1 T=20.8 jaučiasi=21.0\nTG atsiliepimas FB_OK -> korekcija '+S.bias.toFixed(1));
+  else if(c==='wifireset'){
+    msg('bot','🔄 WiFi nustatymai išvalyti. Įrenginys pasileidžia iš naujo ir atidaro „OruStotele-Setup" portalą (192.168.4.1).');
+    show('scr-wififail'); screen.classList.remove('sleeping'); S.state='wififail';
+    setHint('WiFi pamirštas: ekrane klaidos langas. Nustatymui - mygtukas 3-8 s (portalas).');
+  }
+}
 
 /* startas */
 show('scr-wife'); sleep();
