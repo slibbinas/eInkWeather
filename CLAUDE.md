@@ -27,9 +27,23 @@ Su vartotoju bendrauti **lietuviškai**. Kodo komentarai — lietuviškai arba p
 
 - Plokštė: `esp32-s3-devkitc-1`, 16MB flash, PSRAM (framebuffer į PSRAM per `ps_calloc`).
 - Baterijos ADC: GPIO14, daliklio koef. 6.100, kalibruota per `esp_adc_cal` (ADC_ATTEN_DB_12).
-- WiFi: **WiFiManager (tzapu)** — pirmas paleidimas/RESET atidaro AP `OruStotele-Setup` (192.168.4.1, 3 min. timeout), instrukcijos rodomos e-ink ekrane. Pabudus iš taimerio portalas NEatidaromas (baterijos taupymas) — tik bandoma jungtis prie išsaugoto tinklo.
+- **Mygtukas** (GPIO21, EXT0, `ButtonHoldMs()` iki atleidimo): trumpai <3 s — žmonos⇄pilnas ekranas
+  (NVS `wifeMode`, išlieka po restarto); 3–8 s — nustatymų portalas; ≥8 s — OTA režimas
+  (OTA lange dar vienas paspaudimas — Telegram testas). RESET — priverstinis atnaujinimas.
+- WiFi: **WiFiManager (tzapu)** — portalas `OruStotele-Setup` (192.168.4.1) atidaromas TIK
+  sąmoningai (mygtukas 3–8 s), automatiškai NIEKADA. Nepavykus prisijungti (ne taimerio
+  žadinimas) — info langas ekrane, retry kas 30 min.
+- **OTA**: `pio run -e ota -t upload` į `orustotele.local` (progreso juosta ekrane per
+  `epd_push_pixels` dalinį atnaujinimą). Laidinis COM4 — atsarginis (dingsta miegant).
+- **Telegram**: reply klaviatūra (ne inline — callback pasensta miegant); du gavėjai
+  (chatAdmin/chatWife), /kvietimas deep-link, /vardas, /statistika (fbHist), /vadovas,
+  ChillBias ±0.5° mokymasis, ryto patarimo citata vakariniame klausime. getUpdates: limit=3,
+  offset saugomas po kiekvieno update.
+- Piešimo helper'iai: `drawStringTop` (tikslus viršus), `WrapMeasured` (px laužymas),
+  `ClearScreen` (ekranas+buferis — vien epd_clear buferio nevalo!). Papildomas šriftas
+  `opensans48b.h` — tik skaitmenys/°, didelei temperatūrai.
 - Miegas: kas 30 min. (`SleepDuration`), tik tarp `WakeupHour`(5) ir `SleepHour`(23); naktį miega vienu ypu iki ryto.
-- Derinimas: atkomentuoti `#define SERIAL_DEBUG` main.cpp viršuje; `DBG(x)` makrokomanda.
+- Derinimas: atkomentuoti `#define SERIAL_DEBUG` main.cpp viršuje; `DBG(x)`; nuotolinis — Telegram `/log` (`LOGT`).
 - Slėgis rodomas mmHg (`hPa_to_mmHg`), nors Units="M".
 - OWM API: 2.5 (weather + forecast, cnt=24 → 3 paros po 3 val.).
 
@@ -72,20 +86,20 @@ GUI piešiamas TIK nuo realių skaičių. Prieš dedant bet kokį elementą:
 7. **Kai vartotojas sako „užlipa / negražu"** — matuoti to elemento realias
    ribas ir taisyti lentelę, o ne aklai stumdyti ±2 px.
 
-## Ateities planai (eilės tvarka dar nespręsta)
+## Ateities planai
 
-1. **Pranešimai apie bateriją** — kai lieka ~10%, žinutė į Telegram arba WhatsApp (pasirinktinai).
-   Telegram paprasčiau (Bot API, nemokamas); WhatsApp reikia Meta Cloud API arba Twilio.
-2. **„Žmonos režimas"** — supaprastintas ekranas be grafikų: pagrindiniai parametrai + patarimas
-   kaip rengtis (lengva striukė / megztinis / maikutė / lietpaltis...). Žmona — šalčmyrė (nemėgsta
-   šalčio), tad patarimus krypti į šiltesnę pusę. Turi būti lengvas persijungimas tarp pilno ir
-   paprastojo ekrano (pvz., LilyGo mygtukas ar lietimui jautrus ekranas).
-3. **Grįžtamasis ryšys** — per WhatsApp/Telegram įrenginys vakare paklausia „ar prognozė buvo
-   teisinga?" (taip/ne). Atsakymai kaupiami SD kortelėje ir naudojami prognozės korekcijai
-   („mini AI" — pvz., paprastas bias koeficientas temperatūros pojūčiui). Sekti, kad SD neužsipildytų.
-4. **SD kortelė** — duomenų žurnalas ir korekcijų saugykla.
+Atlikta (2026-07): baterijos perspėjimas į Telegram, „žmonos režimas" su aprangos patarimais
+ir mygtuko perjungimu, Telegram grįžtamasis ryšys su besimokančiu ChillBias koeficientu
+(istorija kol kas NVS `fbHist`). Liko:
+
+1. **SD kortelė** — atsakymų istorijos žurnalas su užpildymo priežiūra; koeficientai pagal
+   sezonus/temperatūrų juostas. SD pinai S3: MISO 16, MOSI 15, SCLK 11, CS 42.
+2. **Drabužių ikonos** — dailinti iki docs/mockup_zmonos.svg lygio (žr. memory taisykles:
+   drabužiai, ne pakaitalai; be 🧶; nespalvota).
+3. Pasirinktinai: pranešimų dubliavimas į WhatsApp per CallMeBot (tik viena kryptim).
+4. Repo viešinimas (daro vartotojas; prieš tai — šriftai iš Open Sans vietoj Segoe UI).
 
 ## Pastabos saugumui
 
-`owm_credentials.h` turi realų WiFi slaptažodį ir OWM API raktą — jei projektas keliamas į GitHub,
-failą įtraukti į .gitignore ir palikti šabloną.
+`owm_credentials.h` turi realų WiFi slaptažodį, OWM API raktą ir Telegram token —
+failas yra .gitignore, į repo keliauja tik `owm_credentials_template.h` šablonas.
