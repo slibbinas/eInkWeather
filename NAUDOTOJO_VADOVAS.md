@@ -99,8 +99,13 @@ Stotelė gali bendrauti per Telegram botą (įjungimas — šio skyriaus pabaigo
 - **Vakare** (numatyta 20:00) botas atsiunčia **žmonai** klausimą *„Kaip šiandien tiko apranga
   pagal mano patarimą?"* su keturiais mygtukais:
   🥶 Buvo šalta / 👍 Kaip tik / 🥵 Buvo karšta / 🤷 Nesilaikiau patarimo.
-- Paspaudus mygtuką telefone **iššoka „Užskaityta ✅"**, o žinutė pasikeičia į „Atsakyta: …"
-  (mygtukai dingsta) — taip aišku, kad nuomonė gauta. Žmonos atsakymo kopiją gauna ir adminas.
+- Mygtukai yra **atsakymo (reply) klaviatūra** po žinutės lauku. Paspaudus, telefone iškart
+  **matoma išsiųsta žinutė** (pvz. „🥶 Buvo šalta"), tad aišku, kad nuomonė nukeliavo. Stotelė
+  ją perskaito pabudusi (per ~30 min.), pakoreguoja koeficientą ir atsako patvirtinimu; žmonos
+  atsakymo kopiją gauna ir adminas.
+  > Techninė pastaba: naudojami reply, o ne inline mygtukai sąmoningai — įrenginys miega iki
+  > 30 min., o inline mygtukui Telegram reikalauja atsakyti per kelias sekundes, todėl telefone
+  > nieko nebūtų matoma. Reply žinutė lieka pokalbyje ir nedingsta.
 - **Adminas** gauna įrenginio būseną (`/status`, `/log`) ir **baterijos perspėjimą** 🪫, kai
   baterija nusenka iki 10 % (kartą per dieną).
 

@@ -33,6 +33,45 @@ Su vartotoju bendrauti **lietuviškai**. Kodo komentarai — lietuviškai arba p
 - Slėgis rodomas mmHg (`hPa_to_mmHg`), nors Units="M".
 - OWM API: 2.5 (weather + forecast, cnt=24 → 3 paros po 3 val.).
 
+## Ekrano piešimo taisyklės — layout'as iš matavimų, ne „iš debesų"
+
+GUI piešiamas TIK nuo realių skaičių. Prieš dedant bet kokį elementą:
+
+1. **Faktai iš kodo, ne iš atminties.** Ekranas 960×540, landscape. Prieš
+   piešiant NAUJĄ ekraną — perskaityti esamą piešimo kodą (`DisplayWeather()`
+   ir helper'ius) ir perimti jo koordinačių konvencijas bei helper'ius
+   (`drawString` su LEFT/CENTER/RIGHT lygiavimu), o ne išradinėti savas.
+
+2. **Koordinačių biudžetas PIRMA, kodas PASKUI.** Naujam ekranui pirmiausia
+   surašyti regionų lentelę (pavadinimas, x, y, w, h) taip, kad regionai
+   nepersidengtų ir sumoje tilptų į 960×540 su paraštėmis. Kiekvienas
+   elementas priklauso regionui. Tik tada rašyti piešimo kodą — kiekviena
+   koordinatė kode turi atitikti lentelę.
+
+3. **Teksto dydis MATUOJAMAS, ne spėjamas.** Bibliotekoje yra
+   `get_text_bounds()` — naudoti ją (arba paskaičiuoti: glifų advance sumos)
+   PRIEŠ parenkant vietą. Matuoti su BLOGIAUSIU realiu turiniu, ne su demo
+   reikšme: „-25.5°" (ne „5°"), ilgiausias miesto vardas, ilgiausia LT eilutė
+   iš lang_lt.h. Netelpa → mažinti šriftą arba trumpinti tekstą, NE grūsti.
+
+4. **Baseline, ne viršutinis kraštas.** GFX stiliaus šriftų kursorius yra
+   BAZINĖJE LINIJOJE — klasikinis užlipimų šaltinis. Eilutės žingsnis =
+   šrifto advance_y (ne „apie tiek"). LT diakritikai (Ą, Č, Š, Ž) kyšo
+   aukščiau — tarp eilučių palikti pilną šrifto aukštį, ne cap-height.
+
+5. **Kolizijų patikra skaičiais prieš flash'ą.** Baigus kodą — mintyse (ar
+   ant popieriaus) perskaičiuoti visų užimtų stačiakampių ribas ir patikrinti
+   persidengimus. Tik tada flash'inti. „Sufleškinsim ir pažiūrėsim" ant e-ink
+   ypač brangus — refresh'as lėtas.
+
+6. **E-ink specifika:** spalvos nėra — hierarchija daroma DYDŽIU ir STORIU
+   (16 pilkumo lygių kontrastui menki); smulkus šriftas ant pilko fono
+   neįskaitomas. Turimi šriftai: opensans 8/10/12/18/24 Bold — rinktis iš jų,
+   negeneruoti naujo dėl vieno užrašo.
+
+7. **Kai vartotojas sako „užlipa / negražu"** — matuoti to elemento realias
+   ribas ir taisyti lentelę, o ne aklai stumdyti ±2 px.
+
 ## Ateities planai (eilės tvarka dar nespręsta)
 
 1. **Pranešimai apie bateriją** — kai lieka ~10%, žinutė į Telegram arba WhatsApp (pasirinktinai).

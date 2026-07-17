@@ -27,6 +27,10 @@ void drawCircle(int x0, int y0, int r, uint8_t color);
 void drawRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
 void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
 void drawString(int x, int y, String text, alignment align);
+// Matavimu paremtas pozicionavimas (layout'as iš faktų, ne iš akies)
+void drawStringTop(int x, int yTop, String text, alignment align);
+int  textWidthOf(String text);
+int  textHeightOf(String text);
 void fillTriangle(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color);
 void drawPixel(int x, int y, uint16_t color);
 void drawStringAuto(int x, int y, String text, alignment align);

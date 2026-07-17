@@ -591,7 +591,11 @@ String TgApiCall(const String& method, const String& jsonBody) {
   }
   else code = https.GET();
   String resp = (code > 0) ? https.getString() : "";
-  DBG("TG " + method.substring(0, method.indexOf('?') > 0 ? method.indexOf('?') : method.length()) + " -> " + String(code));
+  int q = method.indexOf('?');
+  String name = method.substring(0, q > 0 ? q : method.length());
+  // Klaidas rašom į RunLog (matoma per /log) - anksčiau jos buvo visiškai nematomos
+  if (code != 200) LOGT("TG " + name + " HTTP " + String(code));
+  else             DBG("TG " + name + " -> 200");
   https.end();
   return resp;
 }
@@ -614,22 +618,34 @@ String FbLabel(const String& data) {
   return "";
 }
 
+// Mygtukai: REPLY klaviatūra (ne inline!). Priežastis: įrenginys miega iki 30 min., o inline
+// callback'ą Telegram reikalauja patvirtinti per kelias sekundes - kitaip telefone tiesiog
+// nieko neįvyksta (callback_query_id pasensta). Reply mygtukas iškart išsiunčia paprastą
+// žinutę - ji MATOMA pokalbyje tą pačią sekundę, o stotelė ją perskaito pabudusi.
 void TgSendMessage(const String& chatId, const String& text, bool withButtons) {
-  DynamicJsonDocument doc(2048);
+  DynamicJsonDocument doc(4096);
   doc["chat_id"] = chatId;
   doc["text"] = text;
   if (withButtons) {
-    JsonArray kb = doc["reply_markup"].createNestedArray("inline_keyboard");
-    JsonArray row1 = kb.createNestedArray();
-    JsonObject b1 = row1.createNestedObject(); b1["text"] = "🥶 Buvo šalta"; b1["callback_data"] = "FB_COLD";
-    JsonObject b2 = row1.createNestedObject(); b2["text"] = "👍 Kaip tik";   b2["callback_data"] = "FB_OK";
-    JsonObject b3 = row1.createNestedObject(); b3["text"] = "🥵 Buvo karšta"; b3["callback_data"] = "FB_HOT";
-    JsonArray row2 = kb.createNestedArray();
-    JsonObject b4 = row2.createNestedObject(); b4["text"] = "🤷 Nesilaikiau patarimo"; b4["callback_data"] = "FB_SKIP";
+    JsonObject rm = doc.createNestedObject("reply_markup");
+    JsonArray kb = rm.createNestedArray("keyboard");
+    JsonArray r1 = kb.createNestedArray(); r1.add("🥶 Buvo šalta");  r1.add("👍 Kaip tik");
+    JsonArray r2 = kb.createNestedArray(); r2.add("🥵 Buvo karšta"); r2.add("🤷 Nesilaikiau");
+    rm["one_time_keyboard"] = true;
+    rm["resize_keyboard"]   = true;
   }
   String body;
   serializeJson(doc, body);
   TgApiCall("sendMessage", body);
+}
+
+// Reply mygtuko tekstas -> atsiliepimo kodas
+String FbCodeFromText(const String& t) {
+  if (t.indexOf("šalta") >= 0)       return "FB_COLD";
+  if (t.indexOf("karšta") >= 0)      return "FB_HOT";
+  if (t.indexOf("Kaip tik") >= 0)    return "FB_OK";
+  if (t.indexOf("Nesilaikiau") >= 0) return "FB_SKIP";
+  return "";
 }
 
 void TgAnswerCallback(const String& cbId, const String& text) { // toast telefone, kad matytųsi jog užskaityta
@@ -650,7 +666,8 @@ void TgEditMessage(const String& chatId, long msgId, const String& text) { // pa
   TgApiCall("editMessageText", body);
 }
 
-void ProcessFeedback(const String& data, const String& cid, const String& cbId, long msgId) {
+// Atsiliepimo užskaitymas - veikia ir iš reply mygtuko (paprastos žinutės), ir iš seno inline callback'o
+void ApplyFeedback(const String& data, const String& cid) {
   String reply;
   if      (data == "FB_COLD") { ChillBias = constrain(ChillBias - 0.5f, -5.0f, 1.0f); FbCold++; reply = "Užrašiau! 🧣 Nuo šiol renku šilčiau."; }
   else if (data == "FB_HOT")  { ChillBias = constrain(ChillBias + 0.5f, -5.0f, 1.0f); FbHot++;  reply = "Supratau! 😎 Kitąkart siūlysiu lengviau."; }
@@ -662,13 +679,19 @@ void ProcessFeedback(const String& data, const String& cid, const String& cbId, 
   prefs.putInt("fbCold", FbCold); prefs.putInt("fbHot", FbHot);
   prefs.putInt("fbOk", FbOk);     prefs.putInt("fbSkip", FbSkip);
   prefs.putInt("fbLast", FbLastDay);
-  TgAnswerCallback(cbId, "Užskaityta ✅");                        // iššokantis patvirtinimas
-  if (msgId) TgEditMessage(cid, msgId, "Atsakyta: " + FbLabel(data) + ". Ačiū! 🙏"); // mygtukai dingsta
+  LOGT("TG atsiliepimas " + data + " -> korekcija " + String(ChillBias, 1));
   TgSendMessage(cid, reply, false);
-  // Kopija adminui, jei žmona atsakė
+  // Kopija adminui, jei atsakė žmona
   String admin = prefs.getString("chatAdmin", prefs.getString("chatId", String(telegramChatID)));
   if (admin.length() && admin != cid)
     TgSendMessage(admin, "👗 Žmona atsakė: " + FbLabel(data) + "\nIšvada: " + FeedbackConclusion(), false);
+}
+
+// Senų inline mygtukų apdorojimas (jei tokių dar kabo Telegram eilėje)
+void ProcessCallback(const String& data, const String& cid, const String& cbId, long msgId) {
+  TgAnswerCallback(cbId, "Užskaityta ✅");   // dažniausiai jau per vėlu (įrenginys miegojo) - nekritiška
+  if (msgId) TgEditMessage(cid, msgId, "Atsakyta: " + FbLabel(data) + ". Ačiū! 🙏");
+  ApplyFeedback(data, cid);
 }
 
 void HandleTgCommand(const String& text, const String& cid) { // /status, /log, /wifireset, /help (tik adminui)
@@ -707,26 +730,39 @@ void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
   String admin = prefs.getString("chatAdmin", prefs.getString("chatId", String(telegramChatID)));
   String wife  = prefs.getString("chatWife", "");
   long offset = prefs.getLong("tgOffset", 0);
-  // 1. Pasiimti naujus atsakymus/žinutes
-  String resp = TgApiCall("getUpdates?offset=" + String(offset) + "&limit=20&timeout=0", "");
+  // 1. Pasiimti naujus atsakymus/žinutes.
+  // SVARBU: limit=3 (ne 20) + didesnis doc. callback_query update'as stambus (jame kartojama visa
+  // originali žinutė su klaviatūra), tad 16 KB su 20 update'ų duodavo NoMemory -> parse'as žlugdavo
+  // -> tgOffset niekada neišsisaugodavo -> tie patys update'ai grįždavo amžinai (stotelė "negaudavo" nieko).
+  String resp = TgApiCall("getUpdates?offset=" + String(offset) + "&limit=3&timeout=0", "");
   if (resp.length() > 0) {
-    DynamicJsonDocument doc(16 * 1024);
-    if (deserializeJson(doc, resp) == DeserializationError::Ok && doc["ok"] == true) {
+    DynamicJsonDocument doc(32 * 1024);
+    DeserializationError err = deserializeJson(doc, resp);
+    if (err) LOGT("TG getUpdates parse FAIL: " + String(err.c_str()));
+    else if (doc["ok"] != true) LOGT("TG getUpdates ok=false");
+    else {
       for (JsonObject upd : doc["result"].as<JsonArray>()) {
         long updId = upd["update_id"].as<long>();
-        if (updId >= offset) offset = updId + 1;
-        if (upd.containsKey("callback_query")) { // mygtuko paspaudimas
+        if (updId >= offset) {
+          offset = updId + 1;
+          prefs.putLong("tgOffset", offset);  // patvirtinam IŠKART - garantuota pažanga net jei toliau lūžtų
+        }
+        if (upd.containsKey("callback_query")) { // senas inline mygtukas (jei dar kabo eilėje)
           String data = upd["callback_query"]["data"].as<const char*>();
           String cid;  serializeJson(upd["callback_query"]["message"]["chat"]["id"], cid);
           String cbId = upd["callback_query"]["id"].as<const char*>();
           long msgId  = upd["callback_query"]["message"]["message_id"].as<long>();
-          ProcessFeedback(data, cid, cbId, msgId);
+          ProcessCallback(data, cid, cbId, msgId);
         }
-        else if (upd.containsKey("message")) { // žinutė botui - registracija arba komanda
+        else if (upd.containsKey("message")) { // žinutė botui: atsiliepimo mygtukas, registracija ar komanda
           String cid; serializeJson(upd["message"]["chat"]["id"], cid);
           String text = upd["message"]["text"] | "";
           String lc = text; lc.toLowerCase();
-          if (lc.startsWith("/zmona")) {
+          String fb = FbCodeFromText(text);     // reply mygtukas atkeliauja kaip paprastas tekstas
+          if (fb.length()) {
+            ApplyFeedback(fb, cid);
+          }
+          else if (lc.startsWith("/zmona")) {
             wife = cid; prefs.putString("chatWife", wife);
             TgSendMessage(cid, "Užregistruota kaip žmona 👗 Vakarais klausiu, ar tiko apranga.", false);
           }
@@ -741,7 +777,6 @@ void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
           else if (cid == admin && text.startsWith("/")) HandleTgCommand(text, cid); // komandas priima tik adminas
         }
       }
-      prefs.putLong("tgOffset", offset);
     }
   }
   int today = (int)(time(NULL) / 86400);
@@ -763,12 +798,13 @@ void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
 // šmaikštus patarimas kaip rengtis ir dienos eiga (rytas/diena/vakaras).
 
 struct ClothingAdvice {
-  String text;
+  String text;   // bazinis patarimas - rodomas dideliu šriftu (18B)
+  String note;   // dienos pokytis / krituliai / vėjas - mažesniu (12B), hierarchija dydžiu
   bool tshirt, sweater, jacket, hat, umbrella;
 };
 
 ClothingAdvice GetClothingAdvice() {
-  ClothingAdvice a = {"", false, false, false, false, false};
+  ClothingAdvice a = {"", "", false, false, false, false, false};
   float feels = WxConditions[0].Feelslike + ChillBias; // šalčmyrės korekcija: mokosi iš Telegram atsakymų
   // Dienos jutiminės temperatūros diapazonas (artimiausios dienos valandos) - kad patarimas
   // atspindėtų ne tik dabar, bet ir kaip keisis oras dienos bėgyje
@@ -820,15 +856,16 @@ ClothingAdvice GetClothingAdvice() {
                         "Šalčio ataka! Storiausia striukė ir arbata termose"};
     a.text = v[day];
   }
-  // Dienos pokytis - iškart po baziniu patarimu (svarbu, kad išliktų net apkarpius ilgą tekstą)
+  // Pastabos atskirai nuo bazinio patarimo - rodomos mažesniu šriftu (netrukdo pagrindinei žinutei)
   if (feelsMax - feels >= 6)
-    a.text += ". Po pietų iki " + String((int)round(feelsMax)) + "° - renkis sluoksniais";
+    a.note = "Po pietų iki " + String((int)round(feelsMax)) + "° - renkis sluoksniais";
   else if (feels - feelsMin >= 6)
-    a.text += ". Vakare atvės iki " + String((int)round(feelsMin)) + "° - pasiimk šiltesnį";
-  // Krituliai/vėjas (ikonos nustatomos nepriklausomai nuo teksto ilgio)
-  if (snowy)      { a.text += ". Sninga - neperšlampami batai!"; a.hat = true; }
-  else if (rainy) { a.text += ". Skėtis būtinas!"; a.umbrella = true; }
-  else if (windy) a.text += ". Vėjas piktas!";
+    a.note = "Vakare atvės iki " + String((int)round(feelsMin)) + "° - pasiimk šiltesnį";
+  String extra;                                  // krituliai/vėjas (ikonos - nepriklausomai nuo teksto)
+  if (snowy)      { extra = "Sninga - neperšlampami batai!"; a.hat = true; }
+  else if (rainy) { extra = "Skėtis būtinas!"; a.umbrella = true; }
+  else if (windy) { extra = "Vėjas piktas - užsisek!"; }
+  if (extra.length()) { if (a.note.length()) a.note += ".  "; a.note += extra; }
   return a;
 }
 
@@ -926,13 +963,33 @@ int FindDayPart(int startHour, int endHour) { // artimiausias prognozės įraša
   return -1;
 }
 
-void DrawDayPart(int x, int y, String label, int idx) {
+// Dienos dalis: antraštė viršuje (12B: yTop..+28), žemiau ikona ir temperatūra šalia (18B: +36..+78)
+void DrawDayPart(int x, int yTop, String label, int idx) {
   if (idx < 0) return;
+  setFont(&OpenSans12B);
+  drawStringTop(x, yTop, label, CENTER);
+  DisplayConditionsSection(x - 46, yTop + 58, WxForecast[idx].Icon, SmallIcon); // ikonos centras
   setFont(&OpenSans18B);
-  drawString(x, y, label, CENTER);                                            // antraštė viršuje
-  DisplayConditionsSection(x - 46, y + 86, WxForecast[idx].Icon, SmallIcon);  // ikona žemiau - nesulipa su antrašte
-  setFont(&OpenSans18B);
-  drawString(x + 44, y + 78, String(WxForecast[idx].Temperature, 0) + "°", CENTER); // temp šalia ikonos vidurio
+  drawStringTop(x + 44, yTop + 36, String(WxForecast[idx].Temperature, 0) + "°", CENTER);
+}
+
+// Išskaido tekstą į eilutes pagal IŠMATUOTĄ pikselių plotį (ne pagal spėtą simbolių skaičių)
+int WrapMeasured(String text, int maxW, String out[], int maxLines) {
+  int n = 0;
+  text.trim();
+  while (text.length() > 0 && n < maxLines) {
+    String line = text;
+    while (line.length() > 0 && textWidthOf(line) > maxW) {
+      int sp = line.lastIndexOf(' ');
+      if (sp <= 0) break;                       // vienas per ilgas žodis - paliekam kaip yra
+      line = line.substring(0, sp);
+    }
+    out[n++] = line;
+    if (line.length() >= text.length()) break;
+    text = text.substring(line.length());
+    text.trim();
+  }
+  return n;
 }
 
 // Viršutinis mygtuko indikatorius: trikampis kampu į viršų ties fiziniu mygtuku
@@ -953,17 +1010,25 @@ void DisplayBottomBar() {
   DrawRSSI(878, 532, wifi_signal);
 }
 
+// REGIONŲ LENTELĖ (960x540). Aukščiai IŠMATUOTI (get_text_bounds), žingsnis = šrifto advance_y.
+// Šriftų advance_y: 8B=22, 10B=28, 12B=33, 18B=50, 48B=133 (48B "17°" realus h=71).
+//   R1 Temperatūra     y   6..158   ikona, „jaučiasi kaip"(18B), jutiminė(48B), termometras(12B), dešinys stulpelis(x620)
+//   L1 linija          y 164
+//   R2 Aprangos pat.   y 168..316   KAIP RENGTIS(8B), ikonos(x 36..284, y 194..249), patarimas(18B x2), pastaba(12B)
+//   L2 linija          y 324
+//   R3 Adaptacija      y 330..386   Korekcija(10B), išvada(12B)
+//   R4 Dienos eiga     y 394..472   antraštė(12B), ikona+temp(18B)
+//   L3 + R5 baras      y 498..534   (DisplayBottomBar)
 void DisplayWifeMode() {
-  // Be viršutinio mygtuko užrašo. Didelė orų piktograma kairėje
-  DisplayConditionsSection(120, 92, WxConditions[0].Icon, LargeIcon);
-  // Didelis skaičius - JUTIMINĖ (kaip jaučiasi); mažas ir ne centre - termometro rodmuo
+  // --- R1: temperatūros blokas ---
+  DisplayConditionsSection(120, 85, WxConditions[0].Icon, LargeIcon);
   setFont(&OpenSans18B);
-  drawString(410, 18, "jaučiasi kaip", CENTER);
+  drawStringTop(410, 6, "jaučiasi kaip", CENTER);                                     // 6..48
   setFont(&OpenSans48B);
-  drawString(410, 72, String(WxConditions[0].Feelslike, 0) + "°", CENTER);   // pastumta žemyn - nebelipa ant užrašo
+  drawStringTop(410, 52, String(WxConditions[0].Feelslike, 0) + "°", CENTER);         // 52..123
   setFont(&OpenSans12B);
-  drawString(270, 150, "termometras rodo " + String(WxConditions[0].Temperature, 0) + "°", LEFT);
-  // Dešinys stulpelis: DIENOS temperatūros maks/min (ne tik dabartinis), vėjas, lietus
+  drawStringTop(270, 128, "termometras rodo " + String(WxConditions[0].Temperature, 0) + "°", LEFT); // 128..156
+  // Dešinys stulpelis: DIENOS temperatūros riba (ne tik dabartinė), vėjas, lietus
   float dMax = WxConditions[0].Temperature, dMin = WxConditions[0].Temperature;
   for (int r = 0; r < 8; r++) {
     time_t ft = WxForecast[r].Dt; struct tm *flt = localtime(&ft);
@@ -972,72 +1037,68 @@ void DisplayWifeMode() {
     if (WxForecast[r].Temperature < dMin) dMin = WxForecast[r].Temperature;
   }
   setFont(&OpenSans18B);
-  fillTriangle(628, 34, 620, 48, 636, 48, Black);   // ▲ dienos maks
-  drawString(646, 32, String(dMax, 0) + "°", LEFT);
-  fillTriangle(628, 82, 620, 68, 636, 68, Black);   // ▼ dienos min
-  drawString(646, 66, String(dMin, 0) + "°", LEFT);
+  fillTriangle(632, 12, 622, 32, 642, 32, Black);                                     // ▲ dienos maks
+  drawStringTop(654, 6, String(dMax, 0) + "°", LEFT);                                 // 6..48
+  fillTriangle(632, 88, 622, 68, 642, 68, Black);                                     // ▼ dienos min
+  drawStringTop(654, 52, String(dMin, 0) + "°", LEFT);                                // 52..94
   setFont(&OpenSans12B);
-  drawString(620, 108, String(WxConditions[0].Windspeed, 0) + " m/s " + WindDegToOrdinalDirection(WxConditions[0].Winddir), LEFT);
+  drawStringTop(622, 100, String(WxConditions[0].Windspeed, 0) + " m/s " + WindDegToOrdinalDirection(WxConditions[0].Winddir), LEFT); // 100..128
   float pop = max(WxForecast[0].Pop, max(WxForecast[1].Pop, WxForecast[2].Pop));
-  drawString(620, 138, "lietus " + String((int)round(pop * 100)) + "%", LEFT);
-  // Aprangos patarimas - be rėmelio, tik linijos; ikonos fiksuotoje zonoje; tekstas fiksuotoje vietoje
+  drawStringTop(622, 130, "lietus " + String((int)round(pop * 100)) + "%", LEFT);     // 130..158
+  drawLine(20, 164, 940, 164, Black);                                                 // L1
+
+  // --- R2: aprangos patarimas (be rėmelio; ikonos kairėje, tekstas fiksuotoje zonoje) ---
   ClothingAdvice adv = GetClothingAdvice();
-  drawLine(20, 172, 940, 172, Black);
-  int iy = 184, is_ = 48, ix = 60;           // platesnis tarpas, kad ikonos nesuliptų
-  #define DRAW2(FN) do { FN(ix, iy, is_); FN(ix + 1, iy + 1, is_); ix += 92; } while (0) // 2x piešimas - storesnis kontūras
+  int iy = 194, is_ = 48, ix = 60;                                                    // ikonos 194..249
+  #define DRAW2(FN) do { FN(ix, iy, is_); FN(ix + 1, iy + 1, is_); ix += 92; } while (0) // 2x - storesnis kontūras
   if (adv.tshirt)   DRAW2(DrawTShirtIcon);
   if (adv.sweater)  DRAW2(DrawSweaterIcon);
   if (adv.jacket)   DRAW2(DrawJacketIcon);
   if (adv.hat)      DRAW2(DrawHatIcon);
-  if (adv.umbrella) DRAW2(DrawUmbrellaIcon); // skėtis tik kai reikia
+  if (adv.umbrella) DRAW2(DrawUmbrellaIcon);                                          // skėtis tik kai reikia
   #undef DRAW2
-  const int tx = 350;                        // FIKSUOTA teksto kairė - nepriklauso nuo ikonų (nebeišlipa)
+  const int tx = 350, tw = 590;                                                       // teksto zona x 350..940
   setFont(&OpenSans8B);
-  drawString(tx, 174, "KAIP RENGTIS", LEFT);
-  setFont(&OpenSans18B);                      // pagrindinė žinutė didesnė
-  String text = adv.text;
-  const unsigned int maxLen = 28;            // 18B: mažiau simbolių per eilutę
-  int line = 0;
-  while (text.length() > 0 && line < 3) {    // iki 3 eilučių
-    String chunk = text;
-    if (text.length() > maxLen) {
-      int split = text.lastIndexOf(' ', maxLen);
-      if (split <= 0) split = maxLen;
-      chunk = text.substring(0, split);
-      text = text.substring(split + 1);
-    }
-    else text = "";
-    drawString(tx, 192 + line * 28, chunk, LEFT);   // aukščiau, kad tilptų 3 eilutės virš linijos
-    line++;
+  drawStringTop(tx, 168, "KAIP RENGTIS", LEFT);                                       // 168..188
+  setFont(&OpenSans18B);
+  String lines[2];
+  int n = WrapMeasured(adv.text, tw, lines, 2);
+  for (int i = 0; i < n; i++) drawStringTop(tx, 192 + i * 48, lines[i], LEFT);        // 192..236, 240..284
+  if (adv.note.length()) {
+    setFont(&OpenSans12B);
+    String nl[1];
+    if (WrapMeasured(adv.note, tw, nl, 1) > 0) drawStringTop(tx, 288, nl[0], LEFT);   // 288..316
   }
-  drawLine(20, 288, 940, 288, Black);               // linija žemiau - nebekerta teksto
-  // Adaptacijos info: korekcija + kada klausta ir atsakyta + išvada (matosi, kad įtakoji ir kad veikia)
-  auto dayToStr = [](int dayNum) -> String {         // dienos numeris (time/86400) -> "MM-DD"
+  drawLine(20, 324, 940, 324, Black);                                                 // L2
+
+  // --- R3: adaptacija (korekcija, kada klausta/atsakyta, kada kitas klausimas, išvada) ---
+  auto dayToStr = [](int dayNum) -> String {                                          // time/86400 -> "MM-DD"
     if (dayNum <= 0) return "-";
     time_t t = (time_t)dayNum * 86400L;
     struct tm *lt = gmtime(&t);
     char buf[8]; sprintf(buf, "%02d-%02d", lt->tm_mon + 1, lt->tm_mday);
     return String(buf);
   };
-  String lastAsk = dayToStr(LastAskDay);   // kada paskutinį kartą išsiųstas klausimas
-  String lastFb  = dayToStr(FbLastDay);    // kada paskutinį kartą gautas atsakymas
   int todayNum = (int)(time(NULL) / 86400);
-  String nextAsk = (LastAskDay != todayNum && CurrentHour < FeedbackHr) // kada bus klausiama kitą kartą
+  String nextAsk = (LastAskDay != todayNum && CurrentHour < FeedbackHr)
                    ? ("šiandien " + String(FeedbackHr) + ":00")
                    : ("rytoj " + String(FeedbackHr) + ":00");
   setFont(&OpenSans10B);
-  drawString(30, 298, "Korekcija " + String(ChillBias, 1) + "°    klausta: " + lastAsk + "    atsakyta: " + lastFb + "    kitas: " + nextAsk, LEFT);
+  drawStringTop(30, 330, "Korekcija " + String(ChillBias, 1) + "°    klausta: " + dayToStr(LastAskDay)
+                + "    atsakyta: " + dayToStr(FbLastDay) + "    kitas: " + nextAsk, LEFT);  // 330..354
   setFont(&OpenSans12B);
   String concl = FeedbackConclusion();
   if (concl.length()) concl.setCharAt(0, toupper(concl.charAt(0)));
-  drawString(30, 322, concl, LEFT);
-  // Dienos eiga: rytas / diena / vakaras (antraštė viršuje, ikona+temp žemiau - nesulipa)
-  DrawDayPart(160, 356, "Rytas",   FindDayPart(6, 10));
-  DrawDayPart(480, 356, "Diena",   FindDayPart(11, 16));
-  DrawDayPart(800, 356, "Vakaras", FindDayPart(17, 22));
-  drawLine(320, 352, 320, 492, LightGrey);
-  drawLine(640, 352, 640, 492, LightGrey);
-  DisplayBottomBar();
+  drawStringTop(30, 358, concl, LEFT);                                                // 358..386
+
+  // --- R4: dienos eiga ---
+  DrawDayPart(160, 394, "Rytas",   FindDayPart(6, 10));
+  DrawDayPart(480, 394, "Diena",   FindDayPart(11, 16));
+  DrawDayPart(800, 394, "Vakaras", FindDayPart(17, 22));
+  drawLine(320, 390, 320, 490, LightGrey);
+  drawLine(640, 390, 640, 490, LightGrey);
+
+  DisplayBottomBar();                                                                 // L3 + R5
 }
 
 void DisplayWeather() {                          // 4.7" e-paper display is 960x540 resolution
@@ -1773,6 +1834,35 @@ void drawString(int x, int y, String text, alignment align) {
   if (align == RIGHT)  x = x - w;
   if (align == CENTER) x = x - w / 2;
   int cursor_y = y + h;
+  write_string(&currentFont, data, &x, &cursor_y, framebuffer);
+}
+
+// --- Teksto MATAVIMAS ir tikslus pozicionavimas ---------------------------------------
+// get_text_bounds su cursor_y = 0 pasako, kad tekstas užims vertikaliai [y1, y1 + h].
+// Todėl norint, kad VIRŠUS būtų tiksliai ties yTop, cursor_y = yTop - y1.
+// Taip layout'as remiasi bibliotekos matavimu, o ne spėjimu (senasis drawString naudoja
+// cursor_y = y + h, tad jo 'y' nėra nei viršus, nei bazinė linija - netinka tiksliam dėliojimui).
+int textWidthOf(String text) {
+  char *data = const_cast<char*>(text.c_str());
+  int x1, y1, w, h, xx = 0, yy = 0;
+  get_text_bounds(&currentFont, data, &xx, &yy, &x1, &y1, &w, &h, NULL);
+  return w;
+}
+
+int textHeightOf(String text) {
+  char *data = const_cast<char*>(text.c_str());
+  int x1, y1, w, h, xx = 0, yy = 0;
+  get_text_bounds(&currentFont, data, &xx, &yy, &x1, &y1, &w, &h, NULL);
+  return h;
+}
+
+void drawStringTop(int x, int yTop, String text, alignment align) {
+  char *data = const_cast<char*>(text.c_str());
+  int x1, y1, w, h, xx = x, yy = 0;
+  get_text_bounds(&currentFont, data, &xx, &yy, &x1, &y1, &w, &h, NULL);
+  if (align == RIGHT)  x = x - w;
+  if (align == CENTER) x = x - w / 2;
+  int cursor_y = yTop - y1;   // tekstas atsiduria tiksliai [yTop, yTop + h]
   write_string(&currentFont, data, &x, &cursor_y, framebuffer);
 }
 
