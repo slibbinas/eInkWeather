@@ -228,6 +228,13 @@ void LoadConfig() { // NVS reikšmės perrašo owm_credentials.h numatytąsias
   FeedbackHr = prefs.getInt("fbHour",      FeedbackHour);
 }
 
+// Išvalo ir fizinį ekraną, IR framebuffer'į. Vien epd_clear() buferio nevalo -
+// piešiant antrą ekraną tekstai uždėtų vienas ant kito (buvo matoma OTA->testas persidengime).
+void ClearScreen() {
+  epd_clear();
+  memset(framebuffer, 0xFF, EPD_WIDTH * EPD_HEIGHT / 2);
+}
+
 // Kiek ms mygtukas laikomas nuspaustas (matuojama iki atleidimo, riba 9 s).
 // <3 s = režimo perjungimas, 3-8 s = nustatymų portalas, >=8 s = OTA įkėlimo režimas.
 unsigned long ButtonHoldMs() {
@@ -320,7 +327,7 @@ const int OTA_BAR_X = 183, OTA_BAR_Y = 334, OTA_BAR_W = 594, OTA_BAR_H = 32;
 
 void StartOtaMode() {
   if (StartWiFi() != WL_CONNECTED) {
-    epd_poweron(); epd_clear();
+    epd_poweron(); ClearScreen();
     setFont(&OpenSans18B);
     drawStringTop(SCREEN_WIDTH / 2, 240, "OTA: nepavyko prisijungti prie WiFi", CENTER);
     edp_update(); epd_poweroff_all();
@@ -328,7 +335,7 @@ void StartOtaMode() {
     ESP.restart();
   }
   epd_poweron();
-  epd_clear();
+  ClearScreen();
   setFont(&OpenSans18B);
   drawStringTop(SCREEN_WIDTH / 2, 80, "OTA įkėlimo režimas", CENTER);
   setFont(&OpenSans12B);
@@ -877,7 +884,7 @@ void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
 // Telegram testas iš OTA lango: išsiunčia testinį klausimą ir 90 s gyvai (be miego) laukia
 // atsakymo - visa grandinė matoma realiu laiku. Į ChillBias statistiką NEskaičiuojama.
 void TelegramTestMode() {
-  epd_clear();
+  ClearScreen();                                   // valo ir buferį - kitaip liktų OTA lango tekstas
   setFont(&OpenSans18B);
   drawStringTop(SCREEN_WIDTH / 2, 60, "Telegram testas", CENTER);
   setFont(&OpenSans12B);
@@ -894,7 +901,7 @@ void TelegramTestMode() {
     ESP.restart();
   }
   long offset = prefs.getLong("tgOffset", 0);
-  TgSendMessage(askTo, "🔧 TESTAS: paspauskite bet kurį mygtuką žemiau", true);
+  TgSendMessage(askTo, "🔧 TESTAS: paspauskite mygtuką žinutės APAČIOJE, prie teksto lauko (jei nesimato - klaviatūros ikona ⌨)", true);
   drawStringTop(SCREEN_WIDTH / 2, 150, String("Klausimas išsiųstas ") + (wife.length() ? "žmonai" : "adminui"), CENTER);
   drawStringTop(SCREEN_WIDTH / 2, 190, "Paspauskite atsakymo mygtuką telefone", CENTER);
   drawStringTop(SCREEN_WIDTH / 2, 230, "Laukiu atsakymo iki 90 s...", CENTER);
@@ -910,7 +917,7 @@ void TelegramTestMode() {
     for (JsonObject upd : doc["result"].as<JsonArray>()) {
       long updId = upd["update_id"].as<long>();
       if (updId >= offset) { offset = updId + 1; prefs.putLong("tgOffset", offset); }
-      if (upd.containsKey("message")) {
+      if (upd.containsKey("message")) {            // naujas reply mygtukas arba tekstas
         String cid; serializeJson(upd["message"]["chat"]["id"], cid);
         String text = upd["message"]["text"] | "";
         String fb = FbCodeFromText(text);
@@ -920,9 +927,20 @@ void TelegramTestMode() {
           break;
         }
       }
+      else if (upd.containsKey("callback_query")) { // SENOS žinutės inline mygtukas - irgi užskaitom
+        String data = upd["callback_query"]["data"].as<const char*>();
+        String cid;  serializeJson(upd["callback_query"]["message"]["chat"]["id"], cid);
+        String cbId = upd["callback_query"]["id"].as<const char*>();
+        TgAnswerCallback(cbId, "Testas ✅");
+        if (data.startsWith("FB_")) {
+          got = FbLabel(data);
+          TgSendMessage(cid, "Testas pavyko ✅ (senos žinutės mygtukas; naujose - mygtukai žinutės apačioje)", false);
+          break;
+        }
+      }
     }
   }
-  epd_clear();
+  ClearScreen();                                   // valo ir buferį - kitaip rezultatas užliptų ant testo lango
   setFont(&OpenSans18B);
   drawStringTop(SCREEN_WIDTH / 2, 200, got.length() ? ("Veikia! Gauta: " + got) : "Atsakymo negauta per 90 s", CENTER);
   setFont(&OpenSans12B);
