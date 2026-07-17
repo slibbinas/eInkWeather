@@ -1390,12 +1390,12 @@ void DisplayWifeMode() {
 
   // --- R2: aprangos patarimas (be rėmelio; ikonos kairėje, tekstas fiksuotoje zonoje) ---
   ClothingAdvice adv = GetClothingAdvice();
-  int iy = 194, is_ = 52, ix = 62;                                                    // ikonos 194..250 (mocko siluetai, storis viduje)
-  if (adv.tshirt)   { DrawTShirtIcon(ix, iy, is_);   ix += 92; }
-  if (adv.sweater)  { DrawSweaterIcon(ix, iy, is_);  ix += 92; }
-  if (adv.jacket)   { DrawJacketIcon(ix, iy, is_);   ix += 92; }
-  if (adv.hat)      { DrawHatIcon(ix, iy, is_);      ix += 92; }
-  if (adv.umbrella) { DrawUmbrellaIcon(ix, iy, is_); ix += 92; }                      // skėtis tik kai reikia
+  int iy = 190, is_ = 68, ix = 66;                                                    // ikonos 190..258; daugiausiai 3 vnt., telpa iki tx=350
+  if (adv.tshirt)   { DrawTShirtIcon(ix, iy, is_);   ix += 100; }
+  if (adv.sweater)  { DrawSweaterIcon(ix, iy, is_);  ix += 100; }
+  if (adv.jacket)   { DrawJacketIcon(ix, iy, is_);   ix += 100; }
+  if (adv.hat)      { DrawHatIcon(ix, iy, is_);      ix += 100; }
+  if (adv.umbrella) { DrawUmbrellaIcon(ix, iy, is_); ix += 100; }                     // skėtis tik kai reikia
   const int tx = 350, tw = 590;                                                       // teksto zona x 350..940
   setFont(&OpenSans8B);
   drawStringTop(tx, 168, "KAIP RENGTIS", LEFT);                                       // 168..188
