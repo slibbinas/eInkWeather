@@ -85,11 +85,17 @@ h1{font-size:20px;margin:0 0 4px}
 
 /* --- Telegram --- */
 .chat{display:flex;flex-direction:column;height:520px}
-.msgs{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px}
-.msg{max-width:85%;padding:8px 12px;border-radius:12px;font-size:13.5px;line-height:1.45;white-space:pre-wrap}
-.msg.bot{background:var(--code-bg);border:1px solid var(--border);align-self:flex-start;border-bottom-left-radius:4px}
-.msg.user{background:var(--accent);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
-.msg.note{background:none;border:1px dashed var(--border);color:var(--muted);align-self:center;font-size:12px}
+/* Telegram numatytasis fonas: žalsvas gradientas + subtilus doodle raštas (atkurtas CSS/SVG - be išorinių resursų) */
+.msgs{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:10px;
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'><g fill='none' stroke='%23ffffff' stroke-opacity='.14' stroke-width='2' stroke-linecap='round'><circle cx='28' cy='30' r='9'/><path d='M120 22 l6 12 13 2 -9 9 2 13 -12 -6 -12 6 2 -13 -9 -9 13 -2 z'/><path d='M30 110 q10 -14 20 0 q-10 14 -20 0 z'/><path d='M100 96 l14 0 -7 20 14 0'/><path d='M64 58 a10 10 0 1 1 8 16 l-8 8'/><circle cx='140' cy='130' r='6'/><path d='M12 70 h16 M20 62 v16'/></g></svg>"),
+    linear-gradient(135deg,#dbddbb 0%,#6ba587 45%,#88b884 72%,#d5d88d 100%);
+  background-size:160px 160px, cover}
+.msg{max-width:85%;padding:8px 12px;border-radius:12px;font-size:13.5px;line-height:1.45;white-space:pre-wrap;
+  box-shadow:0 1px 1px rgba(0,0,0,.12)}
+.msg.bot{background:#fff;color:#1d1f24;align-self:flex-start;border-bottom-left-radius:4px}
+.msg.user{background:#e1ffc7;color:#1d1f24;align-self:flex-end;border-bottom-right-radius:4px}
+.msg.note{background:rgba(255,255,255,.75);color:#3a4a3f;align-self:center;font-size:12px;box-shadow:none;border-radius:14px}
 .kb{display:none;grid-template-columns:1fr 1fr;gap:6px;padding:8px 4px 2px;border-top:1px solid var(--border);margin-top:6px}
 .kb.on{display:grid}
 .kb button{border:1px solid var(--border);background:var(--code-bg);color:var(--text);border-radius:8px;padding:9px 6px;font-size:13px;cursor:pointer}
