@@ -42,7 +42,7 @@
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
-#define FW_VERSION 6             // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
+#define FW_VERSION 7             // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -1532,8 +1532,8 @@ void DisplayWifeMode() {
 
   // --- R2: aprangos patarimas (be rėmelio; ikonos kairėje, tekstas fiksuotoje zonoje) ---
   ClothingAdvice adv = GetClothingAdvice();
-  int iy = 208, ix = 40;                                                              // bitmapai 72x72; centruoti juostoje 164..324 (top=208)
-  for (int i = 0; i < adv.n; i++) { DrawIcon(ix, iy, adv.icons[i]); ix += 82; }       // iki 3 ikonų: x 40,122,204 (iki tx=350)
+  int iy = 194, ix = 30;                                                              // bitmapai 100x100; ~3mm iki linijų (juosta 164..324: top=194, apačia=294)
+  for (int i = 0; i < adv.n; i++) { DrawIcon(ix, iy, adv.icons[i]); ix += 106; }      // iki 3 ikonų: x 30,136,242 (dešinys kraštas 342 < tx=350)
   const int tx = 350, tw = 590;                                                       // teksto zona x 350..940
   setFont(&OpenSans8B);
   drawStringTop(tx, 168, "KAIP RENGTIS", LEFT);                                       // 168..188
