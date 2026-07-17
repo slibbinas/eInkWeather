@@ -1394,7 +1394,7 @@ void DisplayWifeMode() {
 
   // --- R2: aprangos patarimas (be rėmelio; ikonos kairėje, tekstas fiksuotoje zonoje) ---
   ClothingAdvice adv = GetClothingAdvice();
-  int iy = 188, is_ = 75, ix = 68;                                                    // ikonos 188..262; daugiausiai 3 vnt., telpa iki tx=350
+  int iy = 206, is_ = 75, ix = 68;                                                    // ikonos 206..275 - centruotos juostoje 164..324 (kaip makete)
   if (adv.tshirt)   { DrawTShirtIcon(ix, iy, is_);   ix += 100; }
   if (adv.sweater)  { DrawSweaterIcon(ix, iy, is_);  ix += 100; }
   if (adv.jacket)   { DrawJacketIcon(ix, iy, is_);   ix += 100; }
