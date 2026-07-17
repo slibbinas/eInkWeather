@@ -795,6 +795,24 @@ void HandleTgCommand(const String& text, const String& cid) { // /status, /log, 
   else if (cmd.startsWith("/log")) {
     TgSendMessage(cid, RunLog.length() ? ("🧾 Žurnalas:\n" + RunLog) : "Žurnalas tuščias.", false);
   }
+  else if (cmd.startsWith("/kvietimas")) {
+    // Paprasčiausias žmonos prijungimas: botas paruošia persiunčiamą žinutę su deep-link nuoroda.
+    // Žmonai lieka DU bakstelėjimai: nuoroda -> PRADĖTI. Jokio rašymo, jokių komandų.
+    String botUser = prefs.getString("botUser", "");
+    if (botUser.length() == 0) {
+      String r = TgApiCall("getMe", "");
+      DynamicJsonDocument d(1024);
+      if (deserializeJson(d, r) == DeserializationError::Ok && d["ok"] == true) {
+        botUser = (const char*)(d["result"]["username"] | "");
+        if (botUser.length()) prefs.putString("botUser", botUser);
+      }
+    }
+    if (botUser.length()) {
+      TgSendMessage(cid, "Persiųskite žmonai šią žinutę 👇 (ilgai palaikykite ant jos -> Forward)", false);
+      TgSendMessage(cid, "Sveika! Čia mūsų orų stotelė 🌤 Ji vakarais paklaus, ar tiko apranga.\nPaspausk nuorodą ir tada mygtuką PRADĖTI - daugiau nieko daryti nereikia:\nhttps://t.me/" + botUser + "?start=zmona", false);
+    }
+    else TgSendMessage(cid, "Nepavyko gauti boto vardo - pabandykite dar kartą kitame cikle.", false);
+  }
   else if (cmd.startsWith("/wifireset")) {
     TgSendMessage(cid, "🔄 WiFi nustatymai išvalyti. Įrenginys pasileidžia iš naujo ir atidaro „OruStotele-Setup\" portalą (192.168.4.1).", false);
     WiFiManager wm;
@@ -803,7 +821,7 @@ void HandleTgCommand(const String& text, const String& cid) { // /status, /log, 
     ESP.restart();
   }
   else { // /help, /start ar nežinoma komanda
-    TgSendMessage(cid, "Komandos:\n/status – dabartinė būsena ir atsiliepimų suvestinė\n/log – veikimo žurnalas (kaip serial)\n/wifireset – pamiršti WiFi tinklą\n/zmona – užregistruoti žmonos telefoną (klausimams apie aprangą)\n/adminas – užregistruoti admino telefoną (būsena, baterija)\n/help – ši žinutė", false);
+    TgSendMessage(cid, "Komandos:\n/status – dabartinė būsena ir atsiliepimų suvestinė\n/kvietimas – paruošti kvietimą žmonai (persiunčiama nuoroda, jai tik PRADĖTI paspausti)\n/log – veikimo žurnalas (kaip serial)\n/wifireset – pamiršti WiFi tinklą\n/zmona – užregistruoti žmoną ranka\n/adminas – užregistruoti adminą\n/help – ši žinutė", false);
   }
 }
 
@@ -844,9 +862,11 @@ void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
           if (fb.length()) {
             ApplyFeedback(fb, cid);
           }
-          else if (lc.startsWith("/zmona")) {
+          else if (lc.startsWith("/zmona") || (lc.startsWith("/start") && lc.indexOf("zmona") > 0)) {
+            // /zmona ranka ARBA kvietimo nuoroda t.me/<botas>?start=zmona (žmonai - tik PRADĖTI paspausti)
             wife = cid; prefs.putString("chatWife", wife);
-            TgSendMessage(cid, "Užregistruota kaip žmona 👗 Vakarais klausiu, ar tiko apranga.", false);
+            TgSendMessage(cid, "Sveika! 👗 Čia jūsų šeimos orų stotelė. Vakarais paklausiu, ar tiko apranga - atsakysi vienu mygtuko paspaudimu. Daugiau nieko daryti nereikia 🙂", false);
+            if (admin.length() && admin != cid) TgSendMessage(admin, "✅ Žmona prisijungė - klausimai apie aprangą nuo šiol keliaus jai.", false);
           }
           else if (lc.startsWith("/adminas")) {
             admin = cid; prefs.putString("chatAdmin", admin);

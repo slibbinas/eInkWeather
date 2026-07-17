@@ -145,8 +145,16 @@ Parašykite botui komandą — atsakymą gausite per artimiausią pabudimą (iki
    Gausite **token'ą** (ilga eilutė su dvitaškiu).
 2. Įrašykite token'ą per naršyklės portalą (žr. 5 sk., laukas „Telegram bot token") arba į
    `include/owm_credentials.h` (`telegramBotToken`) ir įkelkite programą.
-3. **Jūs** parašykite botui bet ką — tapsite adminu. **Žmona** iš savo telefono parašo `/zmona`.
-   Stotelė per artimiausią pabudimą įsimins abu ir prisistatys.
+3. **Jūs** parašykite botui bet ką — tapsite adminu.
+
+### Žmonos prijungimas (jai nieko nereikia nustatinėti)
+
+1. Parašykite botui **`/kvietimas`** — botas atsiųs paruoštą žinutę su nuoroda.
+2. **Persiųskite** tą žinutę žmonai (ilgai palaikykite ant žinutės → *Forward*).
+3. Žmona bakstelėja nuorodą ir paspaudžia **PRADĖTI** — viskas. Ji užregistruota,
+   vakarais gaus klausimą apie aprangą ir atsakinės vienu mygtuko paspaudimu.
+
+(Atsarginis būdas: žmona pati susiranda botą ir parašo `/zmona`.)
 
 ## 7. Baterija
 
