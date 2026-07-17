@@ -86,14 +86,20 @@ nešokinėja).
 2. `pio run -t upload` (VS Code + PlatformIO, plokštė `esp32-s3-devkitc-1`).
 3. WiFi nustatykite telefonu per AP portalą — instrukcijos ekrane.
 
-Išsamiau — [NAUDOTOJO_VADOVAS.md](NAUDOTOJO_VADOVAS.md).
+Išsamiau — [NAUDOTOJO_VADOVAS.md](NAUDOTOJO_VADOVAS.md). Gražus naudotojo manualas —
+[docs/manualas.html](docs/manualas.html) (atverti naršyklėje; taip pat gaunamas Telegram
+komanda `/vadovas`).
 
 ## Interaktyvus prototipas
 
 [docs/prototipas.html](docs/prototipas.html) — įrenginio ekrano, mygtuko pakopų (trumpas /
 3–8 s / ≥8 s) ir Telegram grandinės simuliacija naršyklėje: perjunkite režimus, atidarykite
 portalą, paleiskite OTA su progreso juosta, atsakykite į vakarinį klausimą ir stebėkite, kaip
-keičiasi ekranas. Atsisiųskite failą ir atverkite naršyklėje.
+keičiasi ekranas.
+
+> GitHub'e ši nuoroda atidaro failo **kodą** — paleidimui failą reikia atverti naršyklėje:
+> klonavus repo tiesiog dukart spustelėkite `docs\prototipas.html`, arba GitHub'e
+> *…* → *Download* ir atverkite atsisiųstą failą.
 
 ---
 

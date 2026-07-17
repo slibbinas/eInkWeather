@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>eInkWeather — naudotojo manualas</title>
+<style>
+:root{
+  --bg:#f7f7f8; --card:#fff; --text:#1d1f24; --muted:#6b7280; --border:#e2e4e9;
+  --accent:#f07a1a; --accent-soft:#fdf0e3; --code-bg:#f0f1f3;
+  --ok:#1a9c46; --eink:#ecebe3; --eink-text:#1c1c1a;
+}
+@media (prefers-color-scheme: dark){
+  :root{--bg:#15171c; --card:#1c1f26; --text:#e6e8ec; --muted:#9aa1ad; --border:#2a2e37;
+        --accent:#ff9740; --accent-soft:#2a2118; --code-bg:#242830;}
+}
+:root[data-theme="dark"]{--bg:#15171c; --card:#1c1f26; --text:#e6e8ec; --muted:#9aa1ad; --border:#2a2e37;
+  --accent:#ff9740; --accent-soft:#2a2118; --code-bg:#242830;}
+:root[data-theme="light"]{--bg:#f7f7f8; --card:#fff; --text:#1d1f24; --muted:#6b7280; --border:#e2e4e9;
+  --accent:#f07a1a; --accent-soft:#fdf0e3; --code-bg:#f0f1f3;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.55}
+.page{max-width:780px;margin:0 auto;padding:20px 16px 60px}
+header.hero{padding:28px 0 8px}
+.eyebrow{font-size:12px;letter-spacing:1.2px;text-transform:uppercase;color:var(--accent);font-weight:700}
+h1{font-size:30px;margin:6px 0 8px;text-wrap:balance}
+.lede{color:var(--muted);font-size:15px;max-width:62ch;margin:0}
+nav{position:sticky;top:0;background:var(--bg);padding:10px 0;margin:14px 0 6px;border-bottom:1px solid var(--border);
+  display:flex;gap:6px;overflow-x:auto;z-index:5}
+nav a{flex:0 0 auto;font-size:13px;color:var(--muted);text-decoration:none;padding:8px 12px;border-radius:20px;border:1px solid var(--border);min-height:36px;display:flex;align-items:center}
+nav a:hover,nav a:focus-visible{color:var(--accent);border-color:var(--accent);outline:none}
+section{margin:26px 0}
+h2{font-size:20px;margin:0 0 4px;scroll-margin-top:70px}
+h2 .n{color:var(--accent)}
+.sec-sub{color:var(--muted);font-size:13.5px;margin:0 0 12px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
+ol.steps{margin:0;padding-left:0;list-style:none;counter-reset:s}
+ol.steps li{counter-increment:s;position:relative;padding:0 0 14px 44px}
+ol.steps li:last-child{padding-bottom:0}
+ol.steps li::before{content:counter(s);position:absolute;left:0;top:-2px;width:28px;height:28px;border-radius:50%;
+  background:var(--accent-soft);color:var(--accent);font-weight:700;display:flex;align-items:center;justify-content:center;font-size:14px}
+ol.steps li b{display:block}
+ol.steps li span{color:var(--muted);font-size:13.5px}
+.tblwrap{overflow-x:auto;border:1px solid var(--border);border-radius:12px}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:520px;background:var(--card)}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);text-align:left}
+th,td{padding:10px 14px;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:0}
+td:first-child{white-space:nowrap;font-variant-numeric:tabular-nums}
+code{font-family:ui-monospace,Consolas,monospace;background:var(--code-bg);padding:2px 7px;border-radius:6px;font-size:.92em}
+.who{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--accent-soft);color:var(--accent)}
+.who.both{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
+/* mygtuko pakopos - trukmės juostos koduoja realų laikymą */
+.hold{display:grid;gap:12px}
+.hold-row{display:grid;grid-template-columns:120px 1fr;gap:12px;align-items:center}
+.hold-bar{height:14px;border-radius:7px;background:var(--accent);opacity:.9}
+.hold-row:nth-child(1) .hold-bar{width:14%}
+.hold-row:nth-child(2) .hold-bar{width:52%}
+.hold-row:nth-child(3) .hold-bar{width:100%}
+.hold-row:nth-child(4) .hold-bar{width:14%;background:var(--muted)}
+.hold-t{font-weight:700;font-variant-numeric:tabular-nums}
+.hold-d b{display:block}
+.hold-d span{color:var(--muted);font-size:13px}
+.callout{border-left:4px solid var(--accent);background:var(--accent-soft);border-radius:0 10px 10px 0;padding:12px 14px;font-size:14px}
+.chat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;max-width:440px}
+.bub{padding:8px 12px;border-radius:12px;font-size:13.5px;max-width:88%;white-space:pre-line}
+.bub.bot{background:var(--code-bg);border:1px solid var(--border);align-self:flex-start;border-bottom-left-radius:4px}
+.bub.user{background:var(--accent);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+.kbrow{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.kbrow span{border:1px solid var(--border);background:var(--code-bg);border-radius:8px;padding:7px;font-size:12.5px;text-align:center}
+dl{margin:0}
+dt{font-weight:700;margin-top:12px}
+dt:first-child{margin-top:0}
+dd{margin:2px 0 0;color:var(--muted);font-size:14px}
+footer{margin-top:36px;color:var(--muted);font-size:12.5px;border-top:1px solid var(--border);padding-top:14px}
+a{color:var(--accent)}
+@media (prefers-reduced-motion: no-preference){
+  nav a{transition:color .15s,border-color .15s}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="hero">
+  <div class="eyebrow">eInkWeather · Naudotojo manualas</div>
+  <h1>Orų stotelė, kuri pataria kaip rengtis — ir mokosi iš jūsų</h1>
+  <p class="lede">Baterija maitinamas e-ink ekranas ant sienos, atsinaujinantis kas 30 min., ir Telegram botas,
+  kuris vakare paklausia, ar apranga tiko. Čia — viskas, ko reikia kasdienai ir nustatymui.</p>
+</header>
+
+<nav aria-label="Sekcijos">
+  <a href="#ciklas">Kaip veikia</a>
+  <a href="#mygtukas">Mygtukas</a>
+  <a href="#telegram">Telegram</a>
+  <a href="#komandos">Komandos</a>
+  <a href="#wifi">WiFi</a>
+  <a href="#ota">OTA</a>
+  <a href="#bedos">Trikčiai</a>
+</nav>
+
+<section id="ciklas">
+  <h2><span class="n">§1</span> Kaip tai veikia</h2>
+  <p class="sec-sub">Įrenginys beveik visą laiką miega — tuo ir gyvena mėnesius nuo vienos baterijos.</p>
+  <div class="card">
+    <ol class="steps">
+      <li><b>Kas 30 min. pabunda</b><span>prisijungia prie WiFi, parsisiunčia orus iš OpenWeatherMap, perpiešia ekraną ir vėl užmiega. Naktį (23–5 val.) miega vienu ypu.</span></li>
+      <li><b>Ryte įsimena dienos patarimą</b><span>„Megztinio diena: nei šalta, nei karšta" — pagal <em>jutiminę</em> temperatūrą, dienos pokytį, lietų ir vėją.</span></li>
+      <li><b>Vakare paklausia per Telegram</b><span>klausime pacituoja, ką siūlė ryte. Atsakymas — vienas mygtuko paspaudimas.</span></li>
+      <li><b>Prisitaiko</b><span>„buvo šalta" → patarimai šiltėja po 0,5°; „buvo karšta" → lengvėja. Korekcija ir datos matosi ekrane.</span></li>
+    </ol>
+  </div>
+</section>
+
+<section id="mygtukas">
+  <h2><span class="n">§2</span> Vienas mygtukas — pagal laikymo trukmę</h2>
+  <p class="sec-sub">Šoninis mygtukas (ne RESET). Trukmė matuojama nuo paspaudimo iki atleidimo.</p>
+  <div class="card hold">
+    <div class="hold-row"><div><div class="hold-t">&lt; 3 s</div><div class="hold-bar"></div></div>
+      <div class="hold-d"><b>Perjungti ekraną</b><span>paprastas („žmonos") ⇄ pilnas su grafikais. Pasirinkimas įsimenamas visam laikui.</span></div></div>
+    <div class="hold-row"><div><div class="hold-t">3–8 s</div><div class="hold-bar"></div></div>
+      <div class="hold-d"><b>Nustatymų portalas</b><span>telefonu prie <code>OruStotele-Setup</code> → <code>192.168.4.1</code>: API raktas, miestas, valandos, Telegram token, WiFi tinklas.</span></div></div>
+    <div class="hold-row"><div><div class="hold-t">≥ 8 s</div><div class="hold-bar"></div></div>
+      <div class="hold-d"><b>OTA įkėlimas</b><span>programos atnaujinimas per WiFi su progreso juosta ekrane. OTA lange spustelėjus dar kartą — Telegram ryšio testas.</span></div></div>
+    <div class="hold-row"><div><div class="hold-t">RESET</div><div class="hold-bar"></div></div>
+      <div class="hold-d"><b>Perkrauti</b><span>priverstinis atnaujinimas bet kuriuo paros metu; pabudęs įrenginys iškart sutvarko Telegram žinutes.</span></div></div>
+  </div>
+</section>
+
+<section id="telegram">
+  <h2><span class="n">§3</span> Telegram: paleidimas ir žmonos prijungimas</h2>
+  <p class="sec-sub">Vienas botas, du vaidmenys: <b>adminas</b> valdo ir mato viską, <b>atsakinėtoja</b> tik spaudžia mygtuką.</p>
+  <div class="card">
+    <ol class="steps">
+      <li><b>Susikurkite botą</b><span>Telegram'e @BotFather → <code>/newbot</code> → gausite token'ą. Įrašykite jį per nustatymų portalą (mygtukas 3–8 s → Setup).</span></li>
+      <li><b>Tapkite adminu</b><span>parašykite botui bet ką — pirmas parašęs tampa administratoriumi.</span></li>
+      <li><b>Duokite vardą</b><span><code>/vardas Justina</code> — juo botas sveikinsis ir žymės statistiką.</span></li>
+      <li><b>Pakvieskite žmoną</b><span><code>/kvietimas</code> → gautą žinutę <em>persiųskite</em> jai → ji bakstelėja nuorodą ir paspaudžia <b>PRADĖTI</b>. Viskas — jai daugiau nieko nustatinėti nereikia.</span></li>
+    </ol>
+  </div>
+  <p class="sec-sub" style="margin-top:14px">Kaip atrodo vakaras:</p>
+  <div class="chat">
+    <div class="bub bot">Labas, Justina! 🙂 Ryte siūliau: 👕👚
+„Megztinio diena: nei šalta, nei karšta — kaip tik. Po pietų iki 24° — renkis sluoksniais"
+
+Kaip tiko? Mygtukai žinutės apačioje 🙂</div>
+    <div class="kbrow"><span>🥶 Buvo šalta</span><span>👍 Kaip tik</span><span>🥵 Buvo karšta</span><span>🤷 Nesilaikiau</span></div>
+    <div class="bub user">👍 Kaip tik</div>
+    <div class="bub bot">Puiku, vadinasi pataikėm! 🎯</div>
+  </div>
+  <p class="sec-sub" style="margin-top:10px">Atsakinėtojo keitimas: naujas <code>/kvietimas</code> kitam žmogui — kas paspaus PRADĖTI, tas perima registraciją; atnaujinkite <code>/vardas</code>.</p>
+</section>
+
+<section id="komandos">
+  <h2><span class="n">§4</span> Komandos</h2>
+  <p class="sec-sub">Rašomos botui kaip įprastos žinutės.</p>
+  <div class="tblwrap"><table>
+    <tr><th>Komanda</th><th>Kas gali</th><th>Ką daro</th></tr>
+    <tr><td><code>/statistika</code></td><td><span class="who both">abu</span></td><td>savaitės suvestinė: dienos, paspaudimai, sumos, korekcija, išvada</td></tr>
+    <tr><td><code>/vadovas</code></td><td><span class="who both">abu</span></td><td>šis manualas sutrumpintai, tiesiai į pokalbį</td></tr>
+    <tr><td><code>/status</code></td><td><span class="who">adminas</span></td><td>pilna įrenginio būsena: orai, baterija, WiFi, korekcija, režimas</td></tr>
+    <tr><td><code>/kvietimas</code></td><td><span class="who">adminas</span></td><td>persiunčiamas kvietimas naujam atsakinėtojui</td></tr>
+    <tr><td><code>/vardas X</code></td><td><span class="who">adminas</span></td><td>kreipinys žinutėse ir statistikoje</td></tr>
+    <tr><td><code>/log</code></td><td><span class="who">adminas</span></td><td>veikimo žurnalas — nuotolinis „serial"</td></tr>
+    <tr><td><code>/wifireset</code></td><td><span class="who">adminas</span></td><td>pamiršti WiFi tinklą ir perkrauti</td></tr>
+  </table></div>
+  <div class="callout" style="margin-top:12px">⏱ <b>Įrenginys miega.</b> Komandas jis perskaito per artimiausią pabudimą — iki ~30 min.
+  Norite iškart? Spustelkite RESET arba režimo mygtuką: pabudęs jis pirmiausia susitvarko Telegram žinutes.</div>
+</section>
+
+<section id="wifi">
+  <h2><span class="n">§5</span> WiFi ir nustatymai</h2>
+  <div class="card"><dl>
+    <dt>Pirmas paleidimas / tinklas dingo</dt>
+    <dd>Ekrane — „Nepavyko prisijungti prie WiFi". Portalas pats neatsidaro: palaikykite mygtuką 3–8 s, kai norėsite nustatyti. Kitaip įrenginys tyliai bando kas 30 min. — router'iui atsigavus viskas susitvarko savaime.</dd>
+    <dt>Nustatymų portalas (mygtukas 3–8 s)</dt>
+    <dd>Telefonu prie <code>OruStotele-Setup</code> → <code>192.168.4.1</code>. „Setup" — OWM API raktas, miestas, šalis, ryto/nakties valandos, Telegram token, klausimo valanda. „Configure WiFi" — tinklo keitimas. Išsaugojus įrenginys pasileidžia iš naujo.</dd>
+    <dt>Tinklo pamiršimas</dt>
+    <dd>Portale „Info" → „Erase", arba per Telegram <code>/wifireset</code>.</dd>
+  </dl></div>
+</section>
+
+<section id="ota">
+  <h2><span class="n">§6</span> Programos atnaujinimas be laido (OTA)</h2>
+  <div class="card">
+    <ol class="steps">
+      <li><b>Palaikykite mygtuką ~8 s</b><span>ekrane — „OTA įkėlimo režimas" su įrenginio adresu ir tuščia progreso juosta. Langas atviras 5 min.</span></li>
+      <li><b>Kompiuteryje</b><span><code>pio run -e ota -t upload</code> (vardas <code>orustotele.local</code>; nesuradus — <code>--upload-port &lt;IP iš ekrano&gt;</code>).</span></li>
+      <li><b>Stebėkite juostą</b><span>ji pildosi ekrane; pabaigoje „Įkelta! Perkraunama...". Jei nieko neįkeliate — po 5 min. grįžta į darbą pats.</span></li>
+    </ol>
+  </div>
+</section>
+
+<section id="bedos">
+  <h2><span class="n">§7</span> Baterija ir trikčiai</h2>
+  <div class="tblwrap"><table>
+    <tr><th>Situacija</th><th>Kas vyksta / ką daryti</th></tr>
+    <tr><td>Baterija ≤ 10 %</td><td>adminas gauna 🪫 žinutę (kartą per dieną). Krauti per USB-C; 100 % ≈ 4,2 V</td></tr>
+    <tr><td>Ekranas neatsinaujina</td><td>patikrinkite bateriją; spustelkite RESET</td></tr>
+    <tr><td>WiFi „nemato" tinklo</td><td>ESP32 mato tik 2,4 GHz — patikrinkite router'į</td></tr>
+    <tr><td>Botas neatsako</td><td>palaukite pabudimo (≤30 min.) arba RESET; <code>/log</code> parodys klaidas</td></tr>
+    <tr><td>Mygtukai žinutėje „neveikia"</td><td>naujose žinutėse mygtukai yra <em>žinutės apačioje prie teksto lauko</em> (kartais po ⌨ ikona)</td></tr>
+  </table></div>
+</section>
+
+<footer>
+  eInkWeather · ESP32-S3 + LilyGo EPD47 · pagrindas — D. Bird (G6EJD) LilyGo-EPD-4-7-OWM-Weather-Display ·
+  išsamus techninis vadovas — repozitoriumo <b>NAUDOTOJO_VADOVAS.md</b>
+</footer>
+
+</div>
+</body>
+</html>

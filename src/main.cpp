@@ -714,6 +714,38 @@ void AppendFbHist(char code) {
   prefs.putString("fbHist", h);
 }
 
+void TgSendMessage(const String& chatId, const String& text, bool withButtons); // apibrėžta žemiau
+
+// Kompaktiškas naudotojo vadovas per Telegram (/vadovas) - dviem žinutėmis (4096 simb. riba)
+void SendManual(const String& cid) {
+  TgSendMessage(cid,
+    "📖 ORŲ STOTELĖS VADOVAS (1/2)\n\n"
+    "🔄 Kasdienis ciklas:\n"
+    "• Ryte stotelė įsimena dienos aprangos patarimą\n"
+    "• Vakare atsakinėtoja gauna klausimą su 4 mygtukais žinutės apačioje (prie teksto lauko)\n"
+    "• Vienas paspaudimas - atsakymas užskaitytas, šilumos koeficientas prisitaiko\n"
+    "• Adminas gauna atsakymo kopiją; korekcija matosi ir įrenginio ekrane\n\n"
+    "🔘 Fizinis mygtukas (vienas, pagal laikymo trukmę):\n"
+    "• Trumpai - perjungti paprastą/pilną ekraną\n"
+    "• 3-8 s - WiFi ir nustatymų portalas (OruStotele-Setup -> 192.168.4.1)\n"
+    "• 8+ s - OTA programos įkėlimas per WiFi\n"
+    "• OTA lange dar kartą - Telegram ryšio testas\n"
+    "• RESET - perkrauti (iškart sutvarko ir Telegram žinutes)", false);
+  TgSendMessage(cid,
+    "📖 VADOVAS (2/2) - komandos\n\n"
+    "Abiem:\n"
+    "/statistika - savaitės atsiliepimų suvestinė\n"
+    "/vadovas - šis vadovas\n\n"
+    "Adminui:\n"
+    "/status - įrenginio būsena\n"
+    "/kvietimas - kvietimas naujam atsakinėtojui (persiųskite; gavėjui tik PRADĖTI paspausti)\n"
+    "/vardas Justina - kaip kreiptis į atsakinėtoją\n"
+    "/log - veikimo žurnalas\n"
+    "/wifireset - pamiršti WiFi tinklą\n\n"
+    "⏱ Įrenginys miega - komandas perskaito per artimiausią pabudimą (iki ~30 min.). "
+    "Norite iškart? Spustelkite RESET arba režimo mygtuką.", false);
+}
+
 // Savaitės statistika - rodoma ir adminui, ir atsakinėjančiam žmogui (/statistika)
 String StatsMessage() {
   const char* wd[7] = {"Sk", "Pr", "An", "Tr", "Kt", "Pn", "Št"};
@@ -847,6 +879,9 @@ void HandleTgCommand(const String& text, const String& cid) { // /status, /log, 
   else if (cmd.startsWith("/statistika")) {
     TgSendMessage(cid, StatsMessage(), false);
   }
+  else if (cmd.startsWith("/vadovas")) {
+    SendManual(cid);
+  }
   else if (cmd.startsWith("/vardas")) {
     String name = text.substring(7); // originalus tekstas - išsaugom didžiąsias/lietuviškas raides
     name.trim();
@@ -882,7 +917,7 @@ void HandleTgCommand(const String& text, const String& cid) { // /status, /log, 
     ESP.restart();
   }
   else { // /help, /start ar nežinoma komanda
-    TgSendMessage(cid, "Komandos:\n/status – dabartinė būsena\n/statistika – savaitės atsiliepimų suvestinė\n/kvietimas – paruošti kvietimą (persiunčiama nuoroda, gavėjui tik PRADĖTI paspausti)\n/vardas Justina – kaip kreiptis į atsakinėjantį žmogų\n/log – veikimo žurnalas (kaip serial)\n/wifireset – pamiršti WiFi tinklą\n/zmona /adminas – registracija ranka\n/help – ši žinutė", false);
+    TgSendMessage(cid, "Komandos:\n/status – dabartinė būsena\n/statistika – savaitės atsiliepimų suvestinė\n/vadovas – naudotojo vadovas\n/kvietimas – paruošti kvietimą (persiunčiama nuoroda, gavėjui tik PRADĖTI paspausti)\n/vardas Justina – kaip kreiptis į atsakinėjantį žmogų\n/log – veikimo žurnalas (kaip serial)\n/wifireset – pamiršti WiFi tinklą\n/zmona /adminas – registracija ranka\n/help – ši žinutė", false);
   }
 }
 
@@ -941,6 +976,7 @@ void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
           }
           else if (cid == admin && text.startsWith("/")) HandleTgCommand(text, cid); // adminui - visos komandos
           else if (cid == wife && lc.startsWith("/statistika")) TgSendMessage(cid, StatsMessage(), false); // žmonai - statistika
+          else if (cid == wife && lc.startsWith("/vadovas")) SendManual(cid);                              // žmonai - vadovas
         }
       }
     }
@@ -1120,7 +1156,7 @@ void SaveDailyAdvice() {
   ClothingAdvice a = GetClothingAdvice();
   String emo;
   if (a.tshirt)   emo += "👕";
-  if (a.sweater)  emo += "🧶";
+  if (a.sweater)  emo += "👚"; // megztinis - drabužis, ne siūlų kamuolys (sweater emoji Unicode neturi)
   if (a.jacket)   emo += "🧥";
   if (a.hat)      emo += "🧢";
   if (a.umbrella) emo += "☂️";
