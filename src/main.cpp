@@ -42,7 +42,7 @@
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
-#define FW_VERSION 16            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
+#define FW_VERSION 17            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -884,8 +884,8 @@ void TgSetupMenus() {
     tgAddCmd(a, "status", "Busena: baterija, WiFi, versija");
     tgAddCmd(a, "statistika", "Savaites atsiliepimu suvestine");
     tgAddCmd(a, "vadovas", "Naudotojo vadovas");
-    tgAddCmd(a, "foto", "Vakarinis klausimas su nuotrauka");
-    tgAddCmd(a, "emoji", "Vakarinis klausimas su emoji");
+    tgAddCmd(a, "foto", "Zmonos klausimas - su nuotrauka");
+    tgAddCmd(a, "emoji", "Zmonos klausimas - su emoji");
     tgAddCmd(a, "demo", "Interaktyvus demo narsykleje");
     tgAddCmd(a, "laikas", "Nustatyti klausimo laika (HH:MM)");
     tgAddCmd(a, "kvietimas", "Sugeneruoti kvietima kitam");
@@ -894,8 +894,8 @@ void TgSetupMenus() {
     tgAddCmd(a, "pat", "Ivesti GitHub rakta atsinaujinimui");
     tgAddCmd(a, "ota", "Ijungti OTA ikelimo rezima");
     tgAddCmd(a, "test", "Testinis vakarinis klausimas (dabar)");
-    tgAddCmd(a, "history", "Seni klausimai lieka chate");
-    tgAddCmd(a, "nohistory", "Chate tik paskutinis klausimas");
+    tgAddCmd(a, "history", "Zmonos chate seni klausimai lieka");
+    tgAddCmd(a, "nohistory", "Zmonos chate tik paskutinis klausimas");
     tgAddCmd(a, "log", "Veikimo zurnalas");
     String body; serializeJson(doc, body);
     TgApiCall("setMyCommands", body);
@@ -1068,11 +1068,11 @@ void HandleTgCommand(const String& text, const String& cid) { // /status, /log, 
   }
   else if (cmd.startsWith("/foto")) {
     prefs.putBool("advPhoto", true);
-    TgSendMessage(cid, "📷 Vakarinis klausimas eis su drabužių nuotrauka.", false);
+    TgSendMessage(cid, "📷 Nustatyta: vakarinis klausimas ŽMONAI eis su drabužių nuotrauka. (valdo adminas)", false);
   }
   else if (cmd.startsWith("/emoji")) {
     prefs.putBool("advPhoto", false);
-    TgSendMessage(cid, "🙂 Vakarinis klausimas eis su emoji (be nuotraukos).", false);
+    TgSendMessage(cid, "🙂 Nustatyta: vakarinis klausimas ŽMONAI eis su emoji, be nuotraukos. (valdo adminas)", false);
   }
   else if (cmd.startsWith("/test")) {
     SaveDailyAdvice();                  // užtikrina šiandienos rytinį patarimą (jei dar nebuvo)
@@ -1080,11 +1080,11 @@ void HandleTgCommand(const String& text, const String& cid) { // /status, /log, 
   }
   else if (cmd.startsWith("/nohistory")) {
     prefs.putBool("histOn", false);
-    TgSendMessage(cid, "🧹 Istorija IŠJUNGTA - chate lieka tik paskutinis klausimas (senas trinamas).", false);
+    TgSendMessage(cid, "🧹 Nustatyta: ŽMONOS chate lieka tik paskutinis vakarinis klausimas (senas trinamas). (valdo adminas)", false);
   }
   else if (cmd.startsWith("/history")) {
     prefs.putBool("histOn", true);
-    TgSendMessage(cid, "🗂 Istorija ĮJUNGTA - seni vakariniai klausimai liks chate.", false);
+    TgSendMessage(cid, "🗂 Nustatyta: seni vakariniai klausimai LIEKA ŽMONOS chate (istorija). (valdo adminas)", false);
   }
   else if (cmd.startsWith("/atnaujinti")) {
     if (GhPat.length() == 0)
