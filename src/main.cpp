@@ -42,7 +42,7 @@
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
-#define FW_VERSION 13            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
+#define FW_VERSION 14            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -893,6 +893,7 @@ void TgSetupMenus() {
     tgAddCmd(a, "atnaujinti", "Patikrinti ir idiegti nauja firmware");
     tgAddCmd(a, "pat", "Ivesti GitHub rakta atsinaujinimui");
     tgAddCmd(a, "ota", "Ijungti OTA ikelimo rezima");
+    tgAddCmd(a, "test", "Testinis vakarinis klausimas (dabar)");
     tgAddCmd(a, "log", "Veikimo zurnalas");
     String body; serializeJson(doc, body);
     TgApiCall("setMyCommands", body);
@@ -909,6 +910,37 @@ void TgSetupMenus() {
     String body; serializeJson(doc, body);
     TgApiCall("setMyCommands", body);
   }
+}
+
+// Vakarinis aprangos klausimas -> askTo. Naudoja rytinį patarimą (advTxt/advWx/advIcons/advEmo).
+// track=true (planinis): ištrina praeitą klausimą ir įsimena naują (chate lieka tik paskutinis).
+// track=false (/test): siunčia be trynimo/įsiminimo (nekliudo planinio klausimo).
+void SendEveningQuestion(const String& askTo, bool track) {
+  int today = (int)(time(NULL) / 86400);
+  if (track) {
+    TgDeleteMessage(askTo, prefs.getLong("askMsg1", 0));
+    TgDeleteMessage(askTo, prefs.getLong("askMsg2", 0));
+  }
+  long m1 = 0, m2 = 0;
+  String nm = FeedbackName();
+  String hi = (askTo == prefs.getString("chatWife", "") && nm != "žmona") ? ("Labas, " + nm + "! 🙂 ") : "";
+  if (prefs.getInt("advDay", -1) == today) {
+    String wx   = prefs.getString("advWx", "");
+    String txt  = prefs.getString("advTxt", "");
+    String comb = prefs.getString("advIcons", "");
+    String head = hi + (wx.length() ? (wx + "\n") : "");
+    if (prefs.getBool("advPhoto", true) && comb.length()) {                          // NUMATYTA: drabužių foto
+      String cap = head + "Ryte siūliau tai (žr. paveikslą):\n„" + txt + "\"";
+      m1 = TgSendPhoto(askTo, "https://tinymakerwifi.com/oi/" + comb + ".png", cap, false);  // foto BE mygtukų
+      m2 = TgSendMessage(askTo, "Kaip tiko? Paspausk mygtuką 🙂", true);                     // mygtukai - ATSKIRA žinute
+    } else {                                                                         // emoji režimas (/emoji)
+      m1 = TgSendMessage(askTo, head + "Ryte siūliau: " + prefs.getString("advEmo", "")
+        + "\n„" + txt + "\"\n\nKaip tiko? Mygtukai žinutės apačioje 🙂", true);
+    }
+  } else {
+    m1 = TgSendMessage(askTo, hi + "Kaip šiandien tiko apranga pagal mano patarimą?", true);
+  }
+  if (track) { prefs.putLong("askMsg1", m1); prefs.putLong("askMsg2", m2); }
 }
 
 // Reply mygtuko tekstas -> atsiliepimo kodas
@@ -1040,6 +1072,10 @@ void HandleTgCommand(const String& text, const String& cid) { // /status, /log, 
     prefs.putBool("advPhoto", false);
     TgSendMessage(cid, "🙂 Vakarinis klausimas eis su emoji (be nuotraukos).", false);
   }
+  else if (cmd.startsWith("/test")) {
+    SaveDailyAdvice();                  // užtikrina šiandienos rytinį patarimą (jei dar nebuvo)
+    SendEveningQuestion(cid, false);    // testinis vakarinis klausimas - adminui, nekliudo planinio
+  }
   else if (cmd.startsWith("/atnaujinti")) {
     if (GhPat.length() == 0)
       TgSendMessage(cid, "Atsinaujinimas neįjungtas. Įveskite GitHub raktą: čia komanda /pat github_pat_xxxxx, arba per Setup portalą (mygtukas 3-8 s).", false);
@@ -1075,7 +1111,7 @@ void HandleTgCommand(const String& text, const String& cid) { // /status, /log, 
     else TgSendMessage(cid, "Naudojimas: /laikas 20:00 (valanda 0-23)", false);
   }
   else { // /help, /start ar nežinoma komanda
-    TgSendMessage(cid, "Komandos:\n/status – dabartinė būsena\n/statistika – savaitės atsiliepimų suvestinė\n/vadovas – naudotojo vadovas\n/kvietimas – paruošti kvietimą (persiunčiama nuoroda, gavėjui tik PRADĖTI paspausti)\n/vardas Justina – kaip kreiptis į atsakinėjantį žmogų\n/laikas 20:00 – klausimo apie aprangą valanda\n/ota <raktas> – įjungti OTA įkėlimo režimą\n/atnaujinti – patikrinti ir įdiegti naujausią programą\n/pat <raktas> – įvesti GitHub raktą atsinaujinimui\n/demo – interaktyvaus demo nuoroda\n/foto /emoji – vakarinis klausimas su nuotrauka ar emoji\n/log – veikimo žurnalas (kaip serial)\n/zmona /adminas – registracija ranka\n/help – ši žinutė", false);
+    TgSendMessage(cid, "Komandos:\n/status – dabartinė būsena\n/statistika – savaitės atsiliepimų suvestinė\n/vadovas – naudotojo vadovas\n/kvietimas – paruošti kvietimą (persiunčiama nuoroda, gavėjui tik PRADĖTI paspausti)\n/vardas Justina – kaip kreiptis į atsakinėjantį žmogų\n/laikas 20:00 – klausimo apie aprangą valanda\n/ota <raktas> – įjungti OTA įkėlimo režimą\n/atnaujinti – patikrinti ir įdiegti naujausią programą\n/pat <raktas> – įvesti GitHub raktą atsinaujinimui\n/demo – interaktyvaus demo nuoroda\n/foto /emoji – vakarinis klausimas su nuotrauka ar emoji\n/test – testinis vakarinis klausimas (dabar)\n/log – veikimo žurnalas (kaip serial)\n/zmona /adminas – registracija ranka\n/help – ši žinutė", false);
   }
 }
 
@@ -1157,29 +1193,7 @@ void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
   // 3. Vakarinis klausimas apie aprangą -> žmonai (jei nustatyta), kitaip adminui (kartą per dieną)
   String askTo = wife.length() ? wife : admin;
   if (askTo.length() && CurrentHour == FeedbackHr && LastAskDay != today) {
-    TgDeleteMessage(askTo, prefs.getLong("askMsg1", 0));   // pašalinam praeitą klausimą - chate lieka tik paskutinis
-    TgDeleteMessage(askTo, prefs.getLong("askMsg2", 0));
-    long m1 = 0, m2 = 0;                                   // naujų žinučių ID (kad rytoj būtų ką ištrinti)
-    // Klausime cituojamas rytinis patarimas (kad būtų aišku, KĄ vertinti) + kreipinys vardu
-    String nm = FeedbackName();
-    String hi = (askTo == wife && nm != "žmona") ? ("Labas, " + nm + "! 🙂 ") : "";
-    if (prefs.getInt("advDay", -1) == today) {
-      String wx  = prefs.getString("advWx", "");
-      String txt = prefs.getString("advTxt", "");
-      String head = hi + (wx.length() ? (wx + "\n") : "");
-      String comb = prefs.getString("advIcons", "");
-      if (prefs.getBool("advPhoto", true) && comb.length()) {                        // NUMATYTA: drabužių foto per URL
-        String cap = head + "Ryte siūliau tai (žr. paveikslą):\n„" + txt + "\"";
-        m1 = TgSendPhoto(askTo, "https://tinymakerwifi.com/oi/" + comb + ".png", cap, false);  // foto BE mygtukų
-        m2 = TgSendMessage(askTo, "Kaip tiko? Paspausk mygtuką 🙂", true);                     // mygtukai - ATSKIRA žinute
-      } else {                                                                       // emoji režimas (/emoji)
-        m1 = TgSendMessage(askTo, head + "Ryte siūliau: " + prefs.getString("advEmo", "")
-          + "\n„" + txt + "\"\n\nKaip tiko? Mygtukai žinutės apačioje 🙂", true);
-      }
-    } else {
-      m1 = TgSendMessage(askTo, hi + "Kaip šiandien tiko apranga pagal mano patarimą?", true);
-    }
-    prefs.putLong("askMsg1", m1); prefs.putLong("askMsg2", m2);
+    SendEveningQuestion(askTo, true);                      // planinis: su trynimu ir įsiminimu
     LastAskDay = today; prefs.putInt("lastAsk", today);
   }
 }
