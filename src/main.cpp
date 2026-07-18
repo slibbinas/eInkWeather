@@ -42,7 +42,7 @@
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
-#define FW_VERSION 12            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
+#define FW_VERSION 13            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -743,7 +743,7 @@ void AppendFbHist(char code) {
   prefs.putString("fbHist", h);
 }
 
-void TgSendMessage(const String& chatId, const String& text, bool withButtons); // apibrėžta žemiau
+long TgSendMessage(const String& chatId, const String& text, bool withButtons); // apibrėžta žemiau (grąžina message_id)
 
 // Kompaktiškas naudotojo vadovas per Telegram (/vadovas) - dviem žinutėmis (4096 simb. riba)
 void SendManual(const String& cid) {
@@ -811,11 +811,32 @@ String StatsMessage() {
   return s;
 }
 
+// Iš Telegram atsakymo ištraukia result.message_id (filtras - foto atsakymas didelis). 0 jei nepavyko.
+long TgParseMsgId(const String& resp) {
+  if (resp.length() == 0) return 0;
+  StaticJsonDocument<64> filter; filter["result"]["message_id"] = true;
+  DynamicJsonDocument d(256);
+  if (deserializeJson(d, resp, DeserializationOption::Filter(filter))) return 0;
+  return d["result"]["message_id"] | 0L;
+}
+
+// Žinutės trynimas (kad chate liktų tik paskutinis vakarinis klausimas). Botas gali trinti savo
+// žinutes iki 48 val. - vakarinis kasdien, tad praeitas visada <48 val.
+void TgDeleteMessage(const String& chatId, long messageId) {
+  if (messageId == 0) return;
+  DynamicJsonDocument doc(256);
+  doc["chat_id"] = chatId;
+  doc["message_id"] = messageId;
+  String body; serializeJson(doc, body);
+  TgApiCall("deleteMessage", body);
+}
+
 // Mygtukai: REPLY klaviatūra (ne inline!). Priežastis: įrenginys miega iki 30 min., o inline
 // callback'ą Telegram reikalauja patvirtinti per kelias sekundes - kitaip telefone tiesiog
 // nieko neįvyksta (callback_query_id pasensta). Reply mygtukas iškart išsiunčia paprastą
 // žinutę - ji MATOMA pokalbyje tą pačią sekundę, o stotelė ją perskaito pabudusi.
-void TgSendMessage(const String& chatId, const String& text, bool withButtons) {
+// Grąžina išsiųstos žinutės message_id (vakariniam klausimui - kad vėliau būtų galima ištrinti).
+long TgSendMessage(const String& chatId, const String& text, bool withButtons) {
   DynamicJsonDocument doc(4096);
   doc["chat_id"] = chatId;
   doc["text"] = text;
@@ -829,12 +850,12 @@ void TgSendMessage(const String& chatId, const String& text, bool withButtons) {
   }
   String body;
   serializeJson(doc, body);
-  TgApiCall("sendMessage", body);
+  return TgParseMsgId(TgApiCall("sendMessage", body));
 }
 
 // Nuotrauka per URL (Telegram serveris pats atsisiunčia) su antrašte ir tais pačiais reply mygtukais.
 // Naudojama vakariniam klausimui: drabužių derinio paveikslas hostinamas tinymakerwifi.com/oi/<derinys>.png
-void TgSendPhoto(const String& chatId, const String& photoUrl, const String& caption, bool withButtons) {
+long TgSendPhoto(const String& chatId, const String& photoUrl, const String& caption, bool withButtons) {
   DynamicJsonDocument doc(4096);
   doc["chat_id"] = chatId;
   doc["photo"]   = photoUrl;
@@ -848,7 +869,7 @@ void TgSendPhoto(const String& chatId, const String& photoUrl, const String& cap
     rm["resize_keyboard"]   = true;
   }
   String body; serializeJson(doc, body);
-  TgApiCall("sendPhoto", body);
+  return TgParseMsgId(TgApiCall("sendPhoto", body));
 }
 
 // Boto komandų MENIU (setMyCommands) - nustatomas paties įrenginio, ateina su firmware per OTA
@@ -1136,6 +1157,9 @@ void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
   // 3. Vakarinis klausimas apie aprangą -> žmonai (jei nustatyta), kitaip adminui (kartą per dieną)
   String askTo = wife.length() ? wife : admin;
   if (askTo.length() && CurrentHour == FeedbackHr && LastAskDay != today) {
+    TgDeleteMessage(askTo, prefs.getLong("askMsg1", 0));   // pašalinam praeitą klausimą - chate lieka tik paskutinis
+    TgDeleteMessage(askTo, prefs.getLong("askMsg2", 0));
+    long m1 = 0, m2 = 0;                                   // naujų žinučių ID (kad rytoj būtų ką ištrinti)
     // Klausime cituojamas rytinis patarimas (kad būtų aišku, KĄ vertinti) + kreipinys vardu
     String nm = FeedbackName();
     String hi = (askTo == wife && nm != "žmona") ? ("Labas, " + nm + "! 🙂 ") : "";
@@ -1146,15 +1170,16 @@ void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
       String comb = prefs.getString("advIcons", "");
       if (prefs.getBool("advPhoto", true) && comb.length()) {                        // NUMATYTA: drabužių foto per URL
         String cap = head + "Ryte siūliau tai (žr. paveikslą):\n„" + txt + "\"";
-        TgSendPhoto(askTo, "https://tinymakerwifi.com/oi/" + comb + ".png", cap, false);  // foto BE mygtukų
-        TgSendMessage(askTo, "Kaip tiko? Paspausk mygtuką 🙂", true);                     // mygtukai - ATSKIRA žinute (reply klaviatura ant nuotraukos ne visur rodoma)
+        m1 = TgSendPhoto(askTo, "https://tinymakerwifi.com/oi/" + comb + ".png", cap, false);  // foto BE mygtukų
+        m2 = TgSendMessage(askTo, "Kaip tiko? Paspausk mygtuką 🙂", true);                     // mygtukai - ATSKIRA žinute
       } else {                                                                       // emoji režimas (/emoji)
-        TgSendMessage(askTo, head + "Ryte siūliau: " + prefs.getString("advEmo", "")
+        m1 = TgSendMessage(askTo, head + "Ryte siūliau: " + prefs.getString("advEmo", "")
           + "\n„" + txt + "\"\n\nKaip tiko? Mygtukai žinutės apačioje 🙂", true);
       }
     } else {
-      TgSendMessage(askTo, hi + "Kaip šiandien tiko apranga pagal mano patarimą?", true);
+      m1 = TgSendMessage(askTo, hi + "Kaip šiandien tiko apranga pagal mano patarimą?", true);
     }
+    prefs.putLong("askMsg1", m1); prefs.putLong("askMsg2", m2);
     LastAskDay = today; prefs.putInt("lastAsk", today);
   }
 }
