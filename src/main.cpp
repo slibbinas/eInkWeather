@@ -42,7 +42,7 @@
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
-#define FW_VERSION 15            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
+#define FW_VERSION 16            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -894,7 +894,8 @@ void TgSetupMenus() {
     tgAddCmd(a, "pat", "Ivesti GitHub rakta atsinaujinimui");
     tgAddCmd(a, "ota", "Ijungti OTA ikelimo rezima");
     tgAddCmd(a, "test", "Testinis vakarinis klausimas (dabar)");
-    tgAddCmd(a, "history", "Seni klausimai chate: on/off");
+    tgAddCmd(a, "history", "Seni klausimai lieka chate");
+    tgAddCmd(a, "nohistory", "Chate tik paskutinis klausimas");
     tgAddCmd(a, "log", "Veikimo zurnalas");
     String body; serializeJson(doc, body);
     TgApiCall("setMyCommands", body);
@@ -1077,12 +1078,13 @@ void HandleTgCommand(const String& text, const String& cid) { // /status, /log, 
     SaveDailyAdvice();                  // užtikrina šiandienos rytinį patarimą (jei dar nebuvo)
     SendEveningQuestion(cid, false);    // testinis vakarinis klausimas - adminui, nekliudo planinio
   }
+  else if (cmd.startsWith("/nohistory")) {
+    prefs.putBool("histOn", false);
+    TgSendMessage(cid, "🧹 Istorija IŠJUNGTA - chate lieka tik paskutinis klausimas (senas trinamas).", false);
+  }
   else if (cmd.startsWith("/history")) {
-    String v = text.substring(8); v.trim(); v.toLowerCase();
-    bool nw = (v == "on") ? true : (v == "off") ? false : !prefs.getBool("histOn", false);  // on/off arba perjungimas
-    prefs.putBool("histOn", nw);
-    TgSendMessage(cid, nw ? "🗂 Istorija ĮJUNGTA - seni vakariniai klausimai liks chate."
-                          : "🧹 Istorija IŠJUNGTA - chate lieka tik paskutinis klausimas (senas trinamas).", false);
+    prefs.putBool("histOn", true);
+    TgSendMessage(cid, "🗂 Istorija ĮJUNGTA - seni vakariniai klausimai liks chate.", false);
   }
   else if (cmd.startsWith("/atnaujinti")) {
     if (GhPat.length() == 0)
@@ -1119,7 +1121,7 @@ void HandleTgCommand(const String& text, const String& cid) { // /status, /log, 
     else TgSendMessage(cid, "Naudojimas: /laikas 20:00 (valanda 0-23)", false);
   }
   else { // /help, /start ar nežinoma komanda
-    TgSendMessage(cid, "Komandos:\n/status – dabartinė būsena\n/statistika – savaitės atsiliepimų suvestinė\n/vadovas – naudotojo vadovas\n/kvietimas – paruošti kvietimą (persiunčiama nuoroda, gavėjui tik PRADĖTI paspausti)\n/vardas Justina – kaip kreiptis į atsakinėjantį žmogų\n/laikas 20:00 – klausimo apie aprangą valanda\n/ota <raktas> – įjungti OTA įkėlimo režimą\n/atnaujinti – patikrinti ir įdiegti naujausią programą\n/pat <raktas> – įvesti GitHub raktą atsinaujinimui\n/demo – interaktyvaus demo nuoroda\n/foto /emoji – vakarinis klausimas su nuotrauka ar emoji\n/test – testinis vakarinis klausimas (dabar)\n/history on/off – ar seni klausimai lieka chate\n/log – veikimo žurnalas (kaip serial)\n/zmona /adminas – registracija ranka\n/help – ši žinutė", false);
+    TgSendMessage(cid, "Komandos:\n/status – dabartinė būsena\n/statistika – savaitės atsiliepimų suvestinė\n/vadovas – naudotojo vadovas\n/kvietimas – paruošti kvietimą (persiunčiama nuoroda, gavėjui tik PRADĖTI paspausti)\n/vardas Justina – kaip kreiptis į atsakinėjantį žmogų\n/laikas 20:00 – klausimo apie aprangą valanda\n/ota <raktas> – įjungti OTA įkėlimo režimą\n/atnaujinti – patikrinti ir įdiegti naujausią programą\n/pat <raktas> – įvesti GitHub raktą atsinaujinimui\n/demo – interaktyvaus demo nuoroda\n/foto /emoji – vakarinis klausimas su nuotrauka ar emoji\n/test – testinis vakarinis klausimas (dabar)\n/history /nohistory – ar seni klausimai lieka chate\n/log – veikimo žurnalas (kaip serial)\n/zmona /adminas – registracija ranka\n/help – ši žinutė", false);
   }
 }
 
