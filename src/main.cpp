@@ -42,7 +42,7 @@
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
-#define FW_VERSION 18            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
+#define FW_VERSION 19            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -1086,6 +1086,10 @@ void HandleTgCommand(const String& text, const String& cid) { // /status, /log, 
     prefs.putBool("histOn", true);
     TgSendMessage(cid, "🗂 Nustatyta: seni vakariniai klausimai LIEKA ŽMONOS chate (istorija). (valdo adminas)", false);
   }
+  else if (cmd.startsWith("/menu")) {
+    TgSetupMenus();
+    TgSendMessage(cid, "🔄 Boto komandų meniu iš naujo išsiųstas. Telefone užverkite/atverkite pokalbį, kad atsinaujintų.", false);
+  }
   else if (cmd.startsWith("/atnaujinti")) {
     if (GhPat.length() == 0)
       TgSendMessage(cid, "Atsinaujinimas neįjungtas. Įveskite GitHub raktą: čia komanda /pat github_pat_xxxxx, arba per Setup portalą (mygtukas 3-8 s).", false);
@@ -1121,7 +1125,7 @@ void HandleTgCommand(const String& text, const String& cid) { // /status, /log, 
     else TgSendMessage(cid, "Naudojimas: /laikas 20:00 (valanda 0-23)", false);
   }
   else { // /help, /start ar nežinoma komanda
-    TgSendMessage(cid, "Komandos:\n/status – dabartinė būsena\n/statistika – savaitės atsiliepimų suvestinė\n/vadovas – naudotojo vadovas\n/kvietimas – paruošti kvietimą (persiunčiama nuoroda, gavėjui tik PRADĖTI paspausti)\n/vardas Vardenė – kaip kreiptis į atsakinėjantį žmogų\n/laikas 20:00 – klausimo apie aprangą valanda\n/ota <raktas> – įjungti OTA įkėlimo režimą\n/atnaujinti – patikrinti ir įdiegti naujausią programą\n/pat <raktas> – įvesti GitHub raktą atsinaujinimui\n/demo – interaktyvaus demo nuoroda\n/foto /emoji – vakarinis klausimas su nuotrauka ar emoji\n/test – testinis vakarinis klausimas (dabar)\n/history /nohistory – ar seni klausimai lieka chate\n/log – veikimo žurnalas (kaip serial)\n/zmona /adminas – registracija ranka\n/help – ši žinutė", false);
+    TgSendMessage(cid, "Komandos:\n/status – dabartinė būsena\n/statistika – savaitės atsiliepimų suvestinė\n/vadovas – naudotojo vadovas\n/kvietimas – paruošti kvietimą (persiunčiama nuoroda, gavėjui tik PRADĖTI paspausti)\n/vardas Vardenė – kaip kreiptis į atsakinėjantį žmogų\n/laikas 20:00 – klausimo apie aprangą valanda\n/ota <raktas> – įjungti OTA įkėlimo režimą\n/atnaujinti – patikrinti ir įdiegti naujausią programą\n/pat <raktas> – įvesti GitHub raktą atsinaujinimui\n/demo – interaktyvaus demo nuoroda\n/foto /emoji – vakarinis klausimas su nuotrauka ar emoji\n/test – testinis vakarinis klausimas (dabar)\n/history /nohistory – ar seni klausimai lieka chate\n/menu – iš naujo išsiųsti komandų meniu\n/log – veikimo žurnalas (kaip serial)\n/zmona /adminas – registracija ranka\n/help – ši žinutė", false);
   }
 }
 
