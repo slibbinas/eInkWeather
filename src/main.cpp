@@ -42,7 +42,7 @@
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
-#define FW_VERSION 11            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
+#define FW_VERSION 12            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -1145,8 +1145,9 @@ void TelegramSync() { // Kviečiama kol WiFi dar įjungtas
       String head = hi + (wx.length() ? (wx + "\n") : "");
       String comb = prefs.getString("advIcons", "");
       if (prefs.getBool("advPhoto", true) && comb.length()) {                        // NUMATYTA: drabužių foto per URL
-        String cap = head + "Ryte siūliau tai (žr. paveikslą).\n„" + txt + "\"\n\nKaip tiko? Mygtukai žinutės apačioje 🙂";
-        TgSendPhoto(askTo, "https://tinymakerwifi.com/oi/" + comb + ".png", cap, true);
+        String cap = head + "Ryte siūliau tai (žr. paveikslą):\n„" + txt + "\"";
+        TgSendPhoto(askTo, "https://tinymakerwifi.com/oi/" + comb + ".png", cap, false);  // foto BE mygtukų
+        TgSendMessage(askTo, "Kaip tiko? Paspausk mygtuką 🙂", true);                     // mygtukai - ATSKIRA žinute (reply klaviatura ant nuotraukos ne visur rodoma)
       } else {                                                                       // emoji režimas (/emoji)
         TgSendMessage(askTo, head + "Ryte siūliau: " + prefs.getString("advEmo", "")
           + "\n„" + txt + "\"\n\nKaip tiko? Mygtukai žinutės apačioje 🙂", true);
