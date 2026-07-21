@@ -24,10 +24,11 @@ Visa informacija: vėjo rožė lietuviškomis kryptimis, astronomija, slėgis (m
 
 Be grafikų: **jutiminė** temperatūra dideliu skaičiumi (kaip iš tikrųjų jaučiasi — būtent tai
 svarbu, ne teorinis termometro rodmuo), termometro rodmuo mažesniu, ir šmaikštus patarimas,
-kaip rengtis, su drabužių piktogramomis (maikutė, megztinis, striukė, kepurė, skėtis) bei
-dienos eiga rytas / diena / vakaras.
+kaip rengtis, su drabužių piktogramomis (pagal jutiminę temperatūrą — nuo maikutės iki pūkinės,
+plius aksesuarai: šalikas / skėtis), dienos maks/min „ŠIANDIEN" skydelyje bei dienos eiga
+rytas / diena / vakaras.
 
-![Paprastasis režimas](docs/mockup_zmonos.svg)
+![Paprastasis režimas](docs/mockup_zmonos.png)
 
 ## Drabužių parinkimo taisyklės
 
@@ -56,7 +57,7 @@ Papildomi **aksesuarai** pridedami pagal orą:
 Ekrane vienu metu rodomas **vienas didelis** pagrindinio drabužio paveikslėlis (124 px) ir iki
 **dviejų mažesnių** aksesuarų (72 px); teksto vieta fiksuota, todėl išdėstymas nešokinėja.
 Piktogramos yra nespalvoti **bitmapai** (`include/clothing_icons.h`), sugeneruoti iš tikrų
-vektorinių (iconify) ikonų, identiški [maketui](docs/mockup_zmonos.svg). Dienos oro permainos
+vektorinių (iconify) ikonų, identiški [maketui](docs/mockup_zmonos.png). Dienos oro permainos
 primenamos patarimo tekste („Po pietų iki X° – renkis sluoksniais" / „Vakare atvės iki X°").
 
 ## Savaime besimokantys patarimai (Telegram)
@@ -132,7 +133,8 @@ redraws the screen. The selected mode persists across sleep cycles.
 - **Simple ("wife") mode** — no graphs: the **feels-like** temperature as the big number (what
   it actually feels like — that's what matters, not the theoretical thermometer reading), the
   thermometer reading smaller, plus witty plain-language advice on what to wear, with clothing
-  pictograms (t-shirt, sweater, jacket, beanie, umbrella) and a morning / afternoon / evening strip.
+  pictograms (by feels-like temperature — from a t-shirt to a down jacket, plus a scarf/umbrella),
+  the day's high/low in a "TODAY" panel and a morning / afternoon / evening strip.
 
 ## Clothing rules
 
@@ -154,7 +156,7 @@ wind (≥ 8 m/s) → a **scarf**; heavy rain (> 2 mm or ≥ 60 % chance) → a *
 (or ≥ 35 % chance) → an **umbrella**; snow → "waterproof boots". On screen one large main-garment
 image (124 px) shows with up to two smaller accessories (72 px); the text position is fixed so the
 layout never shifts. The pictograms are 1-bpp **bitmaps** (`include/clothing_icons.h`) generated
-from real vector (iconify) icons, identical to the [mockup](docs/mockup_zmonos.svg).
+from real vector (iconify) icons, identical to the [mockup](docs/mockup_zmonos.png).
 
 ## Self-learning clothing advice (Telegram)
 

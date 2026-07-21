@@ -53,12 +53,17 @@ h1{font-size:20px;margin:0 0 4px}
 .adv-text{font-size:3.2cqw;font-weight:700;line-height:1.3}
 .adv-note{font-size:2.5cqw;color:var(--eink-muted)}
 .meta{font-size:2.3cqw;color:var(--eink-muted)}
-.concl{font-size:2.6cqw;font-weight:600}
+.concl{font-size:2.9cqw;font-weight:700}
 .days{display:grid;grid-template-columns:1fr 1fr 1fr;text-align:center;margin-top:.6cqw}
 .days>div{border-right:1px solid #c8c7bc;padding:0 1cqw}
 .days>div:last-child{border-right:0}
 .dlabel{font-size:2.7cqw;font-weight:700}
-.dtemp{font-size:3.8cqw;font-weight:700}
+.dtemp{font-size:4.8cqw;font-weight:700}
+/* v20 „ŠIANDIEN" skydelis (dienos maks/min/vėjas/lietus) */
+.today-panel{border:1px solid var(--eink-text);border-radius:2cqw;padding:.7cqw 1cqw;text-align:center;line-height:1.45}
+.tp-h{font-size:2.1cqw;letter-spacing:.12em;color:var(--eink-muted)}
+.tp-row{font-size:3.4cqw;font-weight:700}
+.tp-sub{font-size:2.7cqw;font-weight:600}
 .dicon{font-size:3.4cqw}
 /* pilnas rezimas - schema */
 .fgrid{display:grid;grid-template-columns:1fr 1.6fr 1fr;gap:1cqw;font-size:2.8cqw}
@@ -130,37 +135,43 @@ h1{font-size:20px;margin:0 0 4px}
         <!-- ŽMONOS REŽIMAS -->
         <div class="scr" id="scr-wife">
           <div class="wgrid">
-            <div class="icon-big">⛅</div>
+            <div class="icon-big">🌧</div>
             <div>
               <div class="feels">jaučiasi kaip</div>
-              <div class="big">17°</div>
-              <div class="feels">termometras rodo 17°</div>
+              <div class="big">14°</div>
+              <div class="feels">termometras rodo 16°</div>
             </div>
-            <div class="right-col">▲ 24°<br>▼ 16°<br><span class="emu">3 m/s ŠV<br>lietus 0%</span></div>
+            <div class="today-panel">
+              <div class="tp-h">ŠIANDIEN</div>
+              <div class="tp-row">▲ 18°&nbsp;&nbsp;▼ 12°</div>
+              <div class="tp-sub">Vėjas 5 m/s ŠV</div>
+              <div class="tp-sub">Lietus 50%</div>
+            </div>
           </div>
           <hr class="eline">
           <div class="advice-row">
             <div class="adv-icons">
-              <!-- Maikutė (SVG drabužis, kaip įrenginio ekrane - ne emoji) -->
-              <svg viewBox="0 0 24 26"><path d="M9 3 L4 5 L2 10 L5.5 11.5 L6.5 8.5 L6.5 22 Q6.5 23 7.5 23 L16.5 23 Q17.5 23 17.5 22 L17.5 8.5 L18.5 11.5 L22 10 L20 5 L15 3 Q12 5.5 9 3 Z"/></svg>
-              <!-- Megztinis su mezgimo raštu -->
-              <svg viewBox="0 0 24 26"><path d="M9 3 L4 5 L2 10 L5.5 11.5 L6.5 8.5 L6.5 22 Q6.5 23 7.5 23 L16.5 23 Q17.5 23 17.5 22 L17.5 8.5 L18.5 11.5 L22 10 L20 5 L15 3 Q12 5.5 9 3 Z"/><path d="M8.5 12 q1.2 -1.4 2.4 0 t2.4 0 t2.4 0"/><path d="M8.5 16 q1.2 -1.4 2.4 0 t2.4 0 t2.4 0"/><path d="M9 20.5 v1.6 M11 20.5 v1.6 M13 20.5 v1.6 M15 20.5 v1.6"/></svg>
+              <!-- Striukė (SVG drabužis, kaip įrenginio ekrane - ne emoji) -->
+              <svg viewBox="0 0 24 26"><path d="M9 3 L4 5 L2 10 L5.5 11.5 L6.5 8.5 L6.5 22 Q6.5 23 7.5 23 L16.5 23 Q17.5 23 17.5 22 L17.5 8.5 L18.5 11.5 L22 10 L20 5 L15 3 Q12 5.5 9 3 Z"/><path d="M12 4 v18"/></svg>
+              <!-- Skėtis -->
+              <svg viewBox="0 0 24 26"><path d="M12 3 v2"/><path d="M3 12 a9 8 0 0 1 18 0 Z"/><path d="M12 12 v8 q0 2.5 -3 2"/></svg>
             </div>
             <div>
-              <div class="meta">KAIP RENGTIS</div>
-              <div class="adv-text">Megztinio diena: nei šalta, nei karšta — kaip tik</div>
-              <div class="adv-note">Po pietų iki 24° — renkis sluoksniais</div>
+              <div class="meta">ŠIANDIEN RENKIS</div>
+              <div class="adv-text">Gaivu - lengva striukė</div>
+              <div class="adv-note">Vakare atvės iki 12° - pasiimk skėtį!</div>
             </div>
           </div>
           <hr class="eline">
-          <div class="meta">Korekcija −2.0°&nbsp;&nbsp;&nbsp;klausta: 07-17&nbsp;&nbsp;&nbsp;atsakyta: <span id="fbdate">−</span>&nbsp;&nbsp;&nbsp;kitas: rytoj 20:00</div>
-          <div class="concl" id="concl">Renkuosi patarimus, reikia daugiau atsiliepimų</div>
           <div class="days">
-            <div><div class="dlabel">Rytas</div><div><span class="dicon">🌤</span> <span class="dtemp">18°</span></div></div>
-            <div><div class="dlabel">Diena</div><div><span class="dicon">☀️</span> <span class="dtemp">23°</span></div></div>
-            <div><div class="dlabel">Vakaras</div><div><span class="dicon">⛅</span> <span class="dtemp">24°</span></div></div>
+            <div><div class="dlabel">Rytas</div><div><span class="dicon">🌧</span> <span class="dtemp">13°</span></div></div>
+            <div><div class="dlabel">Diena</div><div><span class="dicon">🌧</span> <span class="dtemp">16°</span></div></div>
+            <div><div class="dlabel">Vakaras</div><div><span class="dicon">⛅</span> <span class="dtemp">14°</span></div></div>
           </div>
-          <div class="ebar"><span class="eh">Vilnius</span><span>Penktadienis, 17-07-2026 @ 08:31</span><span class="batt">🔋 89% 4.09v&nbsp;&nbsp;📶</span></div>
+          <hr class="eline">
+          <div class="concl" id="concl">Renkuosi patarimus, reikia daugiau atsiliepimų</div>
+          <div class="meta">Korekcija −2.0°&nbsp;·&nbsp;atsakyta: <span id="fbdate">−</span>&nbsp;·&nbsp;kitas: rytoj 20:00</div>
+          <div class="ebar"><span class="eh">Vilnius</span><span>Penktadienis, 11-07-2026 @ 07:30</span><span class="batt">🔋 78% 3.98v&nbsp;&nbsp;📶</span></div>
         </div>
 
         <!-- PILNAS REŽIMAS -->

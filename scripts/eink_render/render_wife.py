@@ -8,6 +8,19 @@ import epd_render as E
 E.load_fonts(); E.load_icons()
 W,H=E.W,E.H; F=E.FONTS
 
+def wrap_measured(font, text, maxW, maxlines):   # atitinka main.cpp WrapMeasured
+    out=[]; text=text.strip()
+    while text and len(out)<maxlines:
+        line=text
+        while line and font.bounds(line)[2] > maxW:
+            sp=line.rfind(' ')
+            if sp<=0: break
+            line=line[:sp]
+        out.append(line)
+        if len(line)>=len(text): break
+        text=text[len(line):].strip()
+    return out
+
 class Screen:
     def __init__(s):
         s.img=Image.new("L",(W,H),255); s.d=ImageDraw.Draw(s.img); s.px=s.img.load()
@@ -33,8 +46,12 @@ class Screen:
         fc(cx-60,cy,sc-ls,255); fc(cx+60,cy,sc-ls,255); fc(cx-20,cy-20,sc*1.4-ls,255); fc(cx+30,cy-26,sc*1.75-ls,255)
         fr(cx-58,cy-16,sc*5.9,sc*2-ls*2+2,255)
         F[18].draw_str(s.px, cx-60, cy+25, "///////")   # addrain LargeIcon (18B, baseline=y+h)
-    def sicon(s,cx,cy):  # SmallIcon placeholder
-        s.d.ellipse((cx-20,cy-20,cx+20,cy+20),outline=0,width=3); s.d.line((cx-12,cy+3,cx+12,cy+3),fill=0,width=2)
+    def sicon(s,cx,cy):  # SmallIcon placeholder - mazas debesis (reprezentatyvu; tikras Cloudy/Sunny neatkartotas)
+        s.d.ellipse((cx-22,cy-4,cx-2,cy+16),outline=0,width=2)
+        s.d.ellipse((cx-10,cy-16,cx+14,cy+8),outline=0,width=2)
+        s.d.ellipse((cx+2,cy-4,cx+22,cy+16),outline=0,width=2)
+        s.d.rectangle((cx-20,cy+2,cx+20,cy+16),fill=255)
+        s.d.line((cx-20,cy+14,cx+20,cy+14),fill=0,width=2)
 
 S=dict(city="Vilnius",date="2026-04-14",time="20:00",feels="6",term="8",dmax="11",dmin="3",
        wind="9 m/s PV",pop="40",adv="Paltas ir šiltas šalikas nepakenks",
@@ -47,7 +64,7 @@ S=dict(city="Vilnius",date="2026-04-14",time="20:00",feels="6",term="8",dmax="11
 def bottom(s):
     s.hline(5,955,498,128)
     s.T(15,505,S["city"],12); s.T(150,505,S["date"]+"  @  "+S["time"],12)
-    s.T(620,505,"84% 4.02V",12); s.T(878,505,"WiFi",12); s.T(953,4,"v19",10,'R')
+    s.T(620,505,"84% 4.02V",12); s.T(878,505,"WiFi",12); s.T(953,4,"v20",10,'R')
 
 def current():
     s=Screen()
@@ -61,7 +78,10 @@ def current():
     s.icon(24,182,S["main"],124,124)
     ax=160
     for a in S["acc"]: s.icon(ax,208,a,72,72); ax+=80
-    s.T(350,168,"KAIP RENGTIS",8); s.T(350,192,S["adv"],18); s.T(350,288,S["note"],12)
+    s.T(350,168,"KAIP RENGTIS",8)
+    for i,ln in enumerate(wrap_measured(F[18],S["adv"],590,2)): s.T(350,192+i*48,ln,18)
+    nl=wrap_measured(F[12],S["note"],590,1)
+    if nl: s.T(350,288,nl[0],12)
     s.hline(20,940,324)
     s.T(30,330,"Korekcija "+S["corr"]+"°    klausta: "+S["ask"]+"    atsakyta: "+S["ans"]+"    kitas: "+S["nxt"],10)
     s.T(30,358,S["concl"],12)
@@ -84,7 +104,10 @@ def proposed(big_concl=False):
     s.icon(24,184,S["main"],124,124)
     ax=160
     for a in S["acc"]: s.icon(ax,208,a,72,72); ax+=80
-    s.T(360,170,"ŠIANDIEN RENKIS",10); s.T(360,196,S["adv"],18); s.T(360,292,S["note"],12)
+    s.T(360,170,"ŠIANDIEN RENKIS",10)
+    for i,ln in enumerate(wrap_measured(F[18],S["adv"],580,2)): s.T(360,196+i*48,ln,18)
+    nl=wrap_measured(F[12],S["note"],580,1)
+    if nl: s.T(360,292,nl[0],12)
     s.hline(20,940,326)
     if big_concl:
         # dienos eiga siek tiek auksciau; isvada - SAVA 12B eilute; korekcija/data - maza 10B
@@ -101,25 +124,25 @@ def proposed(big_concl=False):
         s.T(24,474,"Korekcija "+S["corr"]+"°  ·  atsakyta "+S["ans"]+"  ·  kitas "+S["nxt"]+"  ·  "+S["concl"],10)
     bottom(s); return s.img
 
-panA=proposed(False); panB=proposed(True)
-SC=3
-def up(im): return im.resize((W*SC,H*SC),Image.NEAREST)
-a3,b3=up(panA),up(panB)
-pad,top,gap=30,72,92; cw=W*SC
-canvas=Image.new("L",(cw+2*pad, top+H*SC+gap+top+H*SC+pad),255)
-cd=ImageDraw.Draw(canvas); big=ImageFont.truetype(r"C:\Windows\Fonts\segoeuib.ttf",42)
-cd.text((pad,16),"A) v2b + TIKRA oru ikona (Rain LargeIcon portuota)  -  meta viena rami 10B eilute",font=big,fill=0)
-canvas.paste(a3,(pad,top)); cd.rectangle((pad-1,top-1,pad+cw,top+H*SC),outline=0,width=2)
-y2=top+H*SC+gap
-cd.text((pad,y2-52),"B) v2c + TIKRA ikona  -  ISVADA sava 12B eilute (ryskesne), korekcija/data maza 10B",font=big,fill=0)
-canvas.paste(b3,(pad,y2)); cd.rectangle((pad-1,y2-1,pad+cw,y2+H*SC),outline=0,width=2)
-OUTDIR=os.path.dirname(os.path.abspath(__file__))
-out=os.path.join(OUTDIR,"wife_variants.png")
-canvas.save(out); print("saved",out,canvas.size)
-
-# GALUTINIS vienas ekranas (kaip idiegta v20), su remeliu
-fin=panB.resize((W*4,H*4),Image.NEAREST)
-fc=Image.new("L",(W*4+2*20, H*4+2*20),255); ImageDraw.Draw(fc).rectangle((19,19,20+W*4,20+H*4),outline=0,width=2)
-fc.paste(fin,(20,20))
-fout=os.path.join(OUTDIR,"wife_final_v20.png")
-fc.save(fout); print("saved",fout,fc.size)
+if __name__=="__main__":
+ panA=proposed(False); panB=proposed(True)
+ SC=3
+ def up(im): return im.resize((W*SC,H*SC),Image.NEAREST)
+ a3,b3=up(panA),up(panB)
+ pad,top,gap=30,72,92; cw=W*SC
+ canvas=Image.new("L",(cw+2*pad, top+H*SC+gap+top+H*SC+pad),255)
+ cd=ImageDraw.Draw(canvas); big=ImageFont.truetype(r"C:\Windows\Fonts\segoeuib.ttf",42)
+ cd.text((pad,16),"A) v2b + TIKRA oru ikona (Rain LargeIcon portuota)  -  meta viena rami 10B eilute",font=big,fill=0)
+ canvas.paste(a3,(pad,top)); cd.rectangle((pad-1,top-1,pad+cw,top+H*SC),outline=0,width=2)
+ y2=top+H*SC+gap
+ cd.text((pad,y2-52),"B) v2c + TIKRA ikona  -  ISVADA sava 12B eilute (ryskesne), korekcija/data maza 10B",font=big,fill=0)
+ canvas.paste(b3,(pad,y2)); cd.rectangle((pad-1,y2-1,pad+cw,y2+H*SC),outline=0,width=2)
+ OUTDIR=os.path.dirname(os.path.abspath(__file__))
+ out=os.path.join(OUTDIR,"wife_variants.png")
+ canvas.save(out); print("saved",out,canvas.size)
+ # GALUTINIS vienas ekranas (kaip idiegta v20), su remeliu
+ fin=panB.resize((W*4,H*4),Image.NEAREST)
+ fc=Image.new("L",(W*4+2*20, H*4+2*20),255); ImageDraw.Draw(fc).rectangle((19,19,20+W*4,20+H*4),outline=0,width=2)
+ fc.paste(fin,(20,20))
+ fout=os.path.join(OUTDIR,"wife_final_v20.png")
+ fc.save(fout); print("saved",fout,fc.size)
