@@ -46,7 +46,9 @@ DU REŽIMAI (perjungiami mygtuku, būsena WifeMode RTC atmintyje):
 
 FUNKCIJOS:
 - Aprangos patarimai GetClothingAdvice(): pagal jutiminę temp + ChillBias (mokosi iš Telegram);
-  frazės keičiasi kasdien; lietaus/sniego/vėjo modifikatoriai; piktogramos piešiamos linijomis.
+  7 drabužių juostos (maikutė/marškinėliai/švarkelis/megztinis/striukė/paltas/pūkinė), frazės
+  keičiasi kasdien; aksesuarai šalikas/kapišonas/skėtis pagal orą; piktogramos - bitmapai
+  (include/clothing_icons.h, iš tikrų vektorinių ikonų).
 - Telegram TelegramSync() (WiFiClientSecure + Bot API, be serverio): vakare klausia „ar tiko
   apranga?" su mygtukais; atsakymas keičia ChillBias ±0.5°C (ribos −5..+1, NVS); baterijos ≤10%
   perspėjimas; chat ID auto-įsimenamas iš pirmos žinutės.
@@ -67,11 +69,12 @@ KRITINĖS PASTABOS:
 - ReadBattery() atskirtas nuo piešimo; baterijos % constrain.
 - Ištaisyta: SumOfPrecip off-by-one (rodydavo sniegą vietoj drėgnumo), framebuffer NULL apsauga.
 
-BŪSENA (2026-07): firmware pilnas ir kompiliuojasi; žmonos režimas nušlifuotas (blokų aukščiai,
-klausta/atsakyta datos, aprangos patarimas atsižvelgia į dienos oro pokytį). Firmware dar
-NEĮKELTAS į fizinį įrenginį — ekranų išdėstymą gali reikėti koreguoti pagal nuotrauką.
-KAS TOLIAU: įkėlimas į įrenginį ir išdėstymo patikra; SD kortelės žurnalas (atsakymų istorija,
-koeficientai pagal sezonus); pasirinktinai WhatsApp dubliavimas per CallMeBot.
+BŪSENA (2026-07): firmware v19 įkeltas ir veikia įrenginyje; savarankiškas OTA atsinaujinimas
+(/atnaujinti per GitHub), Telegram vakarinis klausimas su drabužių nuotrauka/emoji, boto komandų
+meniu automatinis. Žmonos režimas nušlifuotas (blokų aukščiai, klausta/atsakyta datos, aprangos
+patarimas atsižvelgia į dienos oro pokytį).
+KAS TOLIAU: SD kortelės žurnalas (atsakymų istorija, koeficientai pagal sezonus); repo viešinimas
+(prieš tai - Open Sans šriftai); pasirinktinai WhatsApp dubliavimas per CallMeBot.
 
 Projekto katalogas: C:\Users\SViktoras\Documents\PlatformIO\Projects\eInkWeather
 Repo privatus: github.com/slibbinas/eInkWeather (push per Windows Credential Manager; gh CLI nėra).

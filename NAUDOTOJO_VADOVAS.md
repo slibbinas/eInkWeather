@@ -38,10 +38,12 @@ mygtukas, ne RESET):
   rodmuo mažesniu, šmaikštus patarimas, kaip šiandien rengtis, ir dienos eiga:
   rytas / diena / vakaras.
 
-  Prie patarimo rodomos **drabužių piktogramos** (iki 3 vienu metu): **maikutė** (šilta, ≥15°),
-  **megztinis** su mezgimo raštu (8–22°), **striukė** su apykakle ir užtrauktuku (<15°),
-  **kepurė** su bumbulu (<8° arba sninga), **skėtis** (tik kai lyja ar tikimybė ≥35 %).
-  Žiemos smulkmenos — pirštinės, šalikas, neperšlampami batai — primenamos patarimo tekste.
+  Prie patarimo rodomas **vienas didelis pagrindinio drabužio paveikslėlis** ir iki dviejų mažesnių
+  aksesuarų. Pagrindinis drabužis parenkamas pagal jutiminę temperatūrą: **maikutė** (≥23°),
+  **marškinėliai** (21–23°), **plonas švarkelis** (18–21°), **megztinis** (16–18°), **striukė**
+  (9–16°), **paltas** (−3–9°), **pūkinė** (<−3°). Aksesuarai pagal orą: **šalikas** (stiprus vėjas
+  ≥8 m/s), drabužis su **kapišonu** (smarkus lietus), **skėtis** (lyja ar tikimybė ≥35 %).
+  Sniego, sluoksnių ir dienos oro permainų smulkmenos primenamos patarimo tekste.
 
 > Didelis skaičius rodo, kaip oras **jaučiasi** (su vėju ir drėgme), o ne teorinį termometro
 > rodmenį — būtent tai svarbu renkantis, kaip rengtis.
@@ -92,8 +94,7 @@ Nustatymai saugomi įrenginio atmintyje ir išlieka atjungus maitinimą.
 
 **WiFi tinklo keitimas / pamiršimas** (pvz., persikrausčius):
 - Portale pasirinkite **„Configure WiFi"** ir įveskite naują tinklą, arba
-- **„Info"** puslapyje spauskite **„Erase"** — visiškai pamiršti WiFi (po to atsidarys naujo tinklo langas), arba
-- per Telegram parašykite **`/wifireset`**.
+- **„Info"** puslapyje spauskite **„Erase"** — visiškai pamiršti WiFi (po to atsidarys naujo tinklo langas).
 
 ## 6. Telegram: „ar tiko apranga?" ir baterijos perspėjimai
 
@@ -101,8 +102,10 @@ Stotelė gali bendrauti per Telegram botą (įjungimas — šio skyriaus pabaigo
 **du žmones**: *adminą* (jus) ir *žmoną*.
 
 - **Vakare** (numatyta 20:00) botas atsiunčia **žmonai** klausimą *„Kaip šiandien tiko apranga
-  pagal mano patarimą?"* su keturiais mygtukais:
-  🥶 Buvo šalta / 👍 Kaip tik / 🥵 Buvo karšta / 🤷 Nesilaikiau patarimo.
+  pagal mano patarimą?"* kartu su trumpu tos dienos oru ir tos dienos drabužių **nuotrauka**
+  (numatyta; galima perjungti į **emoji** — `/foto` `/emoji`), o po to — keturiais mygtukais:
+  🥶 Buvo šalta / 👍 Kaip tik / 🥵 Buvo karšta / 🤷 Nesilaikiau patarimo. Ankstesnis klausimas
+  iš pokalbio ištrinamas (nebent `/history`), kad liktų tik naujausias.
 - Mygtukai yra **atsakymo (reply) klaviatūra** po žinutės lauku. Paspaudus, telefone iškart
   **matoma išsiųsta žinutė** (pvz. „🥶 Buvo šalta"), tad aišku, kad nuomonė nukeliavo. Stotelė
   ją perskaito pabudusi (per ~30 min.), pakoreguoja koeficientą ir atsako patvirtinimu; žmonos
@@ -141,6 +144,8 @@ Parašykite botui komandą — atsakymą gausite per artimiausią pabudimą (iki
 | `/demo` | adminas **ir** žmona | Interaktyvaus prototipo nuoroda naršyklėje (<https://tinymakerwifi.com/orai>) |
 | `/laikas HH:MM` | adminas **ir** žmona | Nustato vakarinio klausimo laiką |
 | `/foto` `/emoji` | adminas | Vakarinis klausimas su drabužių **nuotrauka** (numatyta) ar **emoji** |
+| `/history` `/nohistory` | adminas | Ar seni vakariniai klausimai lieka pokalbyje (numatyta — trinami) |
+| `/menu` | adminas | Priverstinai perkrauna boto komandų meniu (jei Telegram rodo pasenusį) |
 | `/atnaujinti` | adminas | Patikrina git ir įsidiegia naujausią firmware (savarankiškas OTA) |
 | `/pat github_pat_…` | adminas | Įveda GitHub raktą (fine-grained PAT) savarankiškam atnaujinimui |
 | `/ota 19750504` | adminas | Įjungia OTA režimą laidiniam/belaidžiam kėlimui (raktas — nustatomas portale) |
@@ -242,6 +247,10 @@ atsisiųskite `OpenSans-Bold.ttf` ir nurodykite jį vietoj `segoeuib.ttf`.
 
 ## 10. Versijų istorija
 
+- **2026-07 (v20, žmonos ekrano perbalansavimas)** — jutiminė temperatūra centruota prie orų
+  ikonos; dienos maks/min/vėjas/lietus sudėti į rėmintą „ŠIANDIEN" skydelį (maks/min vienoje
+  eilutėje); dienos eigos (rytas/diena/vakaras) temperatūros didesnės; besimokančio koeficiento
+  išvada iškelta į atskirą ryškesnę eilutę, o korekcija/datos — po ja mažesniu šriftu.
 - **2026-07 (redizainas)** — status baras perkeltas į apačią, viršuje mygtuko indikatorius ▲;
   žmonos režime jutiminė didele, reali mažu; maks/min/vėjas/lietus dideli su rodyklėmis;
   aprangos blokas be rėmelio su fiksuota teksto vieta; apvalesnės drabužių ikonos; adaptacijos

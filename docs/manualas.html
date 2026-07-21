@@ -105,7 +105,7 @@ a{color:var(--accent)}
   <div class="card">
     <ol class="steps">
       <li><b>Kas 30 min. pabunda</b><span>prisijungia prie WiFi, parsisiunčia orus iš OpenWeatherMap, perpiešia ekraną ir vėl užmiega. Naktį (23–5 val.) miega vienu ypu.</span></li>
-      <li><b>Ryte įsimena dienos patarimą</b><span>„Megztinio diena: nei šalta, nei karšta" — pagal <em>jutiminę</em> temperatūrą, dienos pokytį, lietų ir vėją.</span></li>
+      <li><b>Ryte įsimena dienos patarimą</b><span>„Megztinis: nei šalta, nei karšta" — pagal <em>jutiminę</em> temperatūrą, dienos pokytį, lietų ir vėją.</span></li>
       <li><b>Vakare paklausia per Telegram</b><span>klausime pacituoja, ką siūlė ryte. Atsakymas — vienas mygtuko paspaudimas.</span></li>
       <li><b>Prisitaiko</b><span>„buvo šalta" → patarimai šiltėja po 0,5°; „buvo karšta" → lengvėja. Korekcija ir datos matosi ekrane.</span></li>
     </ol>
@@ -162,7 +162,8 @@ Kaip tiko? Mygtukai žinutės apačioje 🙂</div>
     <tr><td><code>/kvietimas</code></td><td><span class="who">adminas</span></td><td>persiunčiamas kvietimas naujam atsakinėtojui</td></tr>
     <tr><td><code>/vardas X</code></td><td><span class="who">adminas</span></td><td>kreipinys žinutėse ir statistikoje</td></tr>
     <tr><td><code>/log</code></td><td><span class="who">adminas</span></td><td>veikimo žurnalas — nuotolinis „serial"</td></tr>
-    <tr><td><code>/wifireset</code></td><td><span class="who">adminas</span></td><td>pamiršti WiFi tinklą ir perkrauti</td></tr>
+    <tr><td><code>/foto</code> <code>/emoji</code></td><td><span class="who">adminas</span></td><td>vakarinis klausimas su drabužių nuotrauka (numatyta) ar emoji</td></tr>
+    <tr><td><code>/atnaujinti</code></td><td><span class="who">adminas</span></td><td>patikrina ir įsidiegia naujausią firmware (savarankiškas OTA)</td></tr>
   </table></div>
   <div class="callout" style="margin-top:12px">⏱ <b>Įrenginys miega.</b> Komandas jis perskaito per artimiausią pabudimą — iki ~30 min.
   Norite iškart? Spustelkite RESET arba režimo mygtuką: pabudęs jis pirmiausia susitvarko Telegram žinutes.</div>
@@ -176,7 +177,7 @@ Kaip tiko? Mygtukai žinutės apačioje 🙂</div>
     <dt>Nustatymų portalas (mygtukas 3–8 s)</dt>
     <dd>Telefonu prie <code>OruStotele-Setup</code> → <code>192.168.4.1</code>. „Setup" — OWM API raktas, miestas, šalis, ryto/nakties valandos, Telegram token, klausimo valanda. „Configure WiFi" — tinklo keitimas. Išsaugojus įrenginys pasileidžia iš naujo.</dd>
     <dt>Tinklo pamiršimas</dt>
-    <dd>Portale „Info" → „Erase", arba per Telegram <code>/wifireset</code>.</dd>
+    <dd>Portale „Info" → „Erase" (po to atsidarys naujo tinklo langas).</dd>
   </dl></div>
 </section>
 

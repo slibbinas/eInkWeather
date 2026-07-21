@@ -33,36 +33,31 @@ dienos eiga rytas / diena / vakaras.
 
 Patarimas parenkamas pagal **jutiminę** temperatūrą (OWM `feels_like`) su pridėta korekcija
 `ChillBias` (mokosi iš atsiliepimų, žr. žemiau). Gauta reikšmė (`jaučiasi + ChillBias`) patenka
-į vieną iš juostų:
+į vieną iš **septynių** juostų:
 
-| Jutiminė (su korekcija) | Drabužiai | Pavyzdinė frazė |
+| Jutiminė (su korekcija) | Pagrindinis drabužis | Pavyzdinė frazė |
 |---|---|---|
-| ≥ 22 °C | maikutė | „Vasara kaip reikiant – užteks maikutės" |
-| 15–22 °C | maikutė + megztinis | „Megztinio diena: nei šalta, nei karšta" |
-| 8–15 °C | megztinis + striukė | „Oras sako: megztinis. Protas prideda: ir striukė" |
-| 0–8 °C | striukė + kepurė | „Šalta! Šilta striukė ir kepurė" |
-| < 0 °C | žieminė striukė + kepurė | „Speigas! Visa šarvuotė" |
+| ≥ 23 °C | maikutė | „Vasara! Užteks maikutės" |
+| 21–23 °C | marškinėliai | „Šilta – marškinėliai kaip tik" |
+| 18–21 °C | plonas švarkelis | „Vėsoka vasara – plonas švarkelis" |
+| 16–18 °C | megztinis | „Megztinis: nei šalta, nei karšta" |
+| 9–16 °C | striukė | „Gaivu – lengva striukė" |
+| −3–9 °C | paltas | „Šalta – laikas paltui" |
+| < −3 °C | pūkinė | „Speigas! Pūkinė ir jokių kompromisų" |
 
 Kiekviena juosta turi 3 frazių variantus, kurie keičiasi kasdien (ta pati diena – ta pati frazė).
-Papildomi **modifikatoriai** (pridedami prie patarimo):
+Papildomi **aksesuarai** pridedami pagal orą:
 
-- **Lietus** (dabar lyja arba tikimybė ≥ 35 %) → rodoma **skėčio** piktograma, „Skėtis bus geriausias draugas".
-- **Sniegas** → „batai neperšlampami" ir pridedama **kepurė**.
-- **Stiprus vėjas** (≥ 8 m/s, kai nelyja ir nesninga) → „Vėjas piktas – užsisek iki kaklo".
+- **Stiprus vėjas** (≥ 8 m/s) → **šalikas**, „Vėjas piktas – užsisek šaliką".
+- **Smarkus lietus** (> 2 mm arba tikimybė ≥ 60 %) → drabužis su **kapišonu**.
+- **Lietus** (lyja arba tikimybė ≥ 35 %) → **skėtis**, „Pasiimk skėtį".
+- **Sniegas** → „Sninga – neperšlampami batai!".
 
-**Galimos piktogramos ekrane** (piešiamos vektoriais, identiškos [maketui](docs/mockup_zmonos.svg);
-vienu metu rodomos iki 3):
-
-| Piktograma | Kada rodoma |
-|---|---|
-| 👕 maikutė | šilta (≥ 15 °C) |
-| 👚 megztinis (su mezgimo raštu) | vidutiniškai (8–22 °C) |
-| 🧥 striukė (apykaklė + užtrauktukas) | vėsu / šalta (< 15 °C) |
-| 🧢 kepurė su bumbulu | šalta (< 8 °C) arba sninga |
-| ☂️ skėtis | tik kai lyja arba tikimybė ≥ 35 % |
-
-Skėtis rodomas tik kai reikia; teksto vieta fiksuota, todėl išdėstymas nešokinėja. Žiemos
-subtilybės (pirštinės, šalikas, neperšlampami batai) primenamos patarimo tekste.
+Ekrane vienu metu rodomas **vienas didelis** pagrindinio drabužio paveikslėlis (124 px) ir iki
+**dviejų mažesnių** aksesuarų (72 px); teksto vieta fiksuota, todėl išdėstymas nešokinėja.
+Piktogramos yra nespalvoti **bitmapai** (`include/clothing_icons.h`), sugeneruoti iš tikrų
+vektorinių (iconify) ikonų, identiški [maketui](docs/mockup_zmonos.svg). Dienos oro permainos
+primenamos patarimo tekste („Po pietų iki X° – renkis sluoksniais" / „Vakare atvės iki X°").
 
 ## Savaime besimokantys patarimai (Telegram)
 
@@ -75,8 +70,12 @@ subtilybės (pirštinės, šalikas, neperšlampami batai) primenamos patarimo te
   prisitaiko prie šeimininkės, kuri nemėgsta šalčio, ir tai **matosi žmonos ekrane** (korekcija,
   paskutinio atsiliepimo data ir besikeičianti išvada, pvz. „dažniau jaučiate šaltį — renku šilčiau").
 - **Du gavėjai** (vienas botas, du chat ID): *adminas* gauna būseną, baterijos perspėjimus ir
-  žmonos atsiliepimų kopijas; *žmona* gauna tik vakarinį klausimą. Registruojama komandomis
+  žmonos atsiliepimų kopijas; *žmona* gauna tik vakarinį klausimą. Žmona prijungiama per
+  `/kvietimas` (persiunčiamas deep-link — jai užtenka paspausti PRADĖTI); rankinė registracija —
   `/adminas` ir `/zmona`.
+- **Vakarinis klausimas** atsiunčiamas su trumpu tos dienos oru ir tos dienos drabužių
+  **nuotrauka** (numatyta) arba **emoji** (`/foto` `/emoji`); ankstesnis klausimas iš pokalbio
+  ištrinamas (nebent įjungta `/history`), kad liktų tik naujausias.
 - Baterijai nusekus iki 10 % adminas gauna perspėjimą 🪫.
 
 ## Savybės
@@ -137,20 +136,25 @@ redraws the screen. The selected mode persists across sleep cycles.
 
 ## Clothing rules
 
-Advice is chosen from the **feels-like** temperature plus a learned `ChillBias` offset (see below):
+Advice is chosen from the **feels-like** temperature plus a learned `ChillBias` offset (see below),
+which falls into one of **seven** bands:
 
-| Feels-like (with offset) | Garments | Example line |
+| Feels-like (with offset) | Main garment | Example line |
 |---|---|---|
-| ≥ 22 °C | t-shirt | "Proper summer – a t-shirt is enough" |
-| 15–22 °C | t-shirt + sweater | "Sweater day: neither cold nor hot" |
-| 8–15 °C | sweater + jacket | "Weather says sweater, sense adds a jacket" |
-| 0–8 °C | jacket + beanie | "Cold! Warm jacket and a beanie" |
-| < 0 °C | winter jacket + beanie | "Freezing! Full armour" |
+| ≥ 23 °C | t-shirt | "Summer! A t-shirt is enough" |
+| 21–23 °C | shirt | "Warm – a shirt is just right" |
+| 18–21 °C | light jacket | "Coolish summer – a light jacket" |
+| 16–18 °C | sweater | "Sweater: neither cold nor hot" |
+| 9–16 °C | jacket | "Fresh – a light jacket" |
+| −3–9 °C | coat | "Cold – time for a coat" |
+| < −3 °C | down jacket | "Freezing! Down jacket, no compromises" |
 
-Each band has 3 phrasings that rotate daily. Modifiers: **rain** (or ≥ 35 % chance) adds an
-**umbrella**; **snow** adds "waterproof boots" and a beanie; **strong wind** (≥ 8 m/s) adds
-"zip up to the neck". The umbrella shows only when needed; the text position is fixed so the
-layout never shifts.
+Each band has 3 phrasings that rotate daily. Weather **accessories** are added on top: strong
+wind (≥ 8 m/s) → a **scarf**; heavy rain (> 2 mm or ≥ 60 % chance) → a **hooded** garment; rain
+(or ≥ 35 % chance) → an **umbrella**; snow → "waterproof boots". On screen one large main-garment
+image (124 px) shows with up to two smaller accessories (72 px); the text position is fixed so the
+layout never shifts. The pictograms are 1-bpp **bitmaps** (`include/clothing_icons.h`) generated
+from real vector (iconify) icons, identical to the [mockup](docs/mockup_zmonos.svg).
 
 ## Self-learning clothing advice (Telegram)
 
@@ -163,8 +167,10 @@ layout never shifts.
   **visible on the wife's screen** (the offset, the last-feedback date, and a changing verdict
   such as "you feel the cold more — dressing you warmer").
 - **Two recipients** (one bot, two chat IDs): the *admin* gets status, battery warnings and copies
-  of the wife's answers; the *wife* only gets the evening question. Registered via `/adminas`
-  and `/zmona`.
+  of the wife's answers; the *wife* only gets the evening question. The wife is added via a
+  forwarded `/kvietimas` deep-link (she just taps START); manual registration is `/adminas` /
+  `/zmona`. The evening question includes the day's short weather and a clothing **photo** (default)
+  or **emoji** (`/foto` `/emoji`); the previous question is deleted unless `/history` is on.
 - When the battery drops to 10 %, the admin gets a warning 🪫.
 
 No external server required — the ESP32 talks to the Telegram Bot API directly and picks up
