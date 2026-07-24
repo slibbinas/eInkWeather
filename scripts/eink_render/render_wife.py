@@ -64,7 +64,7 @@ S=dict(city="Vilnius",date="2026-04-14",time="20:00",feels="6",term="8",dmax="11
 def bottom(s):
     s.hline(5,955,498,128)
     s.T(15,505,S["city"],12); s.T(150,505,S["date"]+"  @  "+S["time"],12)
-    s.T(620,505,"84% 4.02V",12); s.T(878,505,"WiFi",12); s.T(953,4,"v20",10,'R')
+    s.T(620,505,"84% 4.02V",12); s.T(878,505,"WiFi",12); s.T(953,4,"v22",10,'R')
 
 def current():
     s=Screen()
@@ -105,9 +105,11 @@ def proposed(big_concl=False):
     ax=160
     for a in S["acc"]: s.icon(ax,208,a,72,72); ax+=80
     s.T(360,170,"ŠIANDIEN RENKIS",10)
-    for i,ln in enumerate(wrap_measured(F[18],S["adv"],580,2)): s.T(360,196+i*48,ln,18)
-    nl=wrap_measured(F[12],S["note"],580,1)
-    if nl: s.T(360,292,nl[0],12)
+    _lines=wrap_measured(F[24],S["adv"],580,2)              # patarimas 24B (v22)
+    for i,ln in enumerate(_lines): s.T(360,198+i*66,ln,24)
+    if len(_lines)==1:                                      # pastaba tik kai patarimas 1 eil.
+        nl=wrap_measured(F[12],S["note"],580,1)
+        if nl: s.T(360,272,nl[0],12)
     s.hline(20,940,326)
     if big_concl:
         # dienos eiga siek tiek auksciau; isvada - SAVA 12B eilute; korekcija/data - maza 10B

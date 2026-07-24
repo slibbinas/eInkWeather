@@ -42,7 +42,7 @@
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
-#define FW_VERSION 21            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
+#define FW_VERSION 22            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -1696,7 +1696,7 @@ void DrawStaleBar(const String& lastUpd, bool noWifi) {
 //                                    termometras(12B,C x470); „ŠIANDIEN" skydelis x686..930 y24..150
 //                                    (10B antr., maks/min 18B vienoj eil., vėjas+lietus 12B)
 //   L1 linija          y 162
-//   R2 Aprangos pat.   y 170..320   ŠIANDIEN RENKIS(10B), ikonos(x24..312, y182/208), patarimas(18B x2 x360), pastaba(12B)
+//   R2 Aprangos pat.   y 170..320   ŠIANDIEN RENKIS(10B), ikonos(x24..312, y182/208), patarimas(24B x2 x360), pastaba(12B, tik kai patarimas 1 eil.)
 //   L2 linija          y 326
 //   R3 Dienos eiga     y 332..428   antraštė(12B), ikona+temp(24B); vert. skirtukai x320/640
 //   L4 linija          y 434
@@ -1743,15 +1743,15 @@ void DisplayWifeMode() {
   for (int i = 1; i < adv.n; i++) { DrawIcon(ax, ay, adv.icons[i], ICON_A_W, ICON_A_H); ax += ICON_A_W + 8; } // x160,240 (<tx=360)
   const int tx = 360, tw = 580;                                                       // teksto zona x 360..940
   setFont(&OpenSans10B);
-  drawStringTop(tx, 170, "ŠIANDIEN RENKIS", LEFT);                                     // 170..198
-  setFont(&OpenSans18B);
+  drawStringTop(tx, 170, "ŠIANDIEN RENKIS", LEFT);                                     // 170..189
+  setFont(&OpenSans24B);                                                              // patarimas RYŠKUS (v22; visos frazės telpa ≤2 eil. per tw=580)
   String lines[2];
   int n = WrapMeasured(adv.text, tw, lines, 2);
-  for (int i = 0; i < n; i++) drawStringTop(tx, 196 + i * 48, lines[i], LEFT);        // 196..240, 244..288
-  if (adv.note.length()) {
+  for (int i = 0; i < n; i++) drawStringTop(tx, 198 + i * 66, lines[i], LEFT);        // 198..246, 264..312
+  if (n == 1 && adv.note.length()) {                                                  // pastaba tik kai patarimas 1 eil. (2 eil. užpildo zoną)
     setFont(&OpenSans12B);
     String nl[1];
-    if (WrapMeasured(adv.note, tw, nl, 1) > 0) drawStringTop(tx, 292, nl[0], LEFT);   // 292..320
+    if (WrapMeasured(adv.note, tw, nl, 1) > 0) drawStringTop(tx, 272, nl[0], LEFT);   // 272..300
   }
   drawLine(20, 326, 940, 326, Black);                                                 // L2
 
