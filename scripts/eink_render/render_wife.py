@@ -53,7 +53,7 @@ class Screen:
         s.d.rectangle((cx-20,cy+2,cx+20,cy+16),fill=255)
         s.d.line((cx-20,cy+14,cx+20,cy+14),fill=0,width=2)
 
-S=dict(city="Vilnius",date="2026-04-14",time="20:00",feels="6",term="8",dmax="11",dmin="3",
+S=dict(city="Vilnius",date="Penktadienis, 24-07-2026",time="13:55:07",feels="6",term="8",dmax="11",dmin="3",
        wind="9 m/s PV",pop="40",adv="Paltas ir šiltas šalikas nepakenks",
        note="Vakare atvės iki 3° - pasiimk šiltesnį.  Pasiimk skėtį!",
        corr="-2.0",ask="04-14",ans="04-13",nxt="rytoj 20:00",
@@ -63,9 +63,13 @@ S=dict(city="Vilnius",date="2026-04-14",time="20:00",feels="6",term="8",dmax="11
 
 def bottom(s):
     s.hline(5,955,498,128)
-    s.T(15,505,S["city"],12); s.T(150,505,S["date"]+"  @  "+S["time"],12)
-    s.T(600,505,"v24",12,'R')                                  # versija - bare po laiko (v24+)
-    s.T(620,505,"84% 4.02V",12); s.T(878,505,"WiFi",12)
+    s.T(15,505,S["city"],12)
+    dt=S["date"]+"  @  "+S["time"][:5]                         # HH:MM be sekundžių
+    s.T(150,505,dt,12)
+    vx=150+F[12].bounds(dt)[2]+22                              # versija po IŠMATUOTOS datos
+    s.T(vx,505,"v25",12)
+    s.d.rectangle((645,514,689,529),outline=0,width=2); s.d.rectangle((689,518,695,525),fill=0)  # baterijos ikona @645
+    s.T(705,505,"80% 4.02v",12); s.T(878,505,"WiFi",12)
 
 def current():
     s=Screen()

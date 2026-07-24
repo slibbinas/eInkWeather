@@ -6,7 +6,7 @@ from PIL import Image, ImageDraw
 import render_wife as R
 
 R.S.update(dict(
-    city="Vilnius", date="2026-04-14", time="20:00",
+    city="Vilnius", date="Penktadienis, 24-07-2026", time="13:55:07",
     feels="14", term="16", dmax="18", dmin="12", wind="5 m/s ŠV", pop="50",
     adv="Gaivu - lengva striukė",
     note="Vakare atvės iki 12° - pasiimk skėtį!",

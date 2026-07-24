@@ -42,7 +42,7 @@
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
-#define FW_VERSION 24            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
+#define FW_VERSION 25            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -1649,13 +1649,17 @@ void DrawTopButtonHint(bool wifeMode) {
 }
 
 // Apatinis baras: miestas + data + VERSIJA + baterija + WiFi (abu režimai), linija virš jo.
-// Versija (v24+) perkelta iš viršaus į apatinę juostą - tarp laiko ir baterijos (tuščia zona).
+// Versija (v25+) apatinėje juostoje IŠKART po datos - x apskaičiuojamas iš IŠMATUOTO datos pločio
+// (textWidthOf), ne spėjamas. Laike sekundžių NErodom (bare jos sustingusios 30 min - beprasmės),
+// tad data trumpesnė ir versija tikrai telpa prieš bateriją (ikona @645).
 void DisplayBottomBar() {
   drawLine(5, 498, 955, 498, Grey);
   setFont(&OpenSans12B);
   drawString(15, 505, City, LEFT);
-  drawString(150, 505, Date_str + "  @  " + Time_str, LEFT);
-  drawString(600, 505, "v" + String(FW_VERSION), RIGHT);   // versija - po laiko, prieš bateriją (dešiniuoju kraštu x600)
+  String dt = Date_str + "  @  " + Time_str.substring(0, 5);   // HH:MM be sekundžių
+  drawString(150, 505, dt, LEFT);
+  int vx = 150 + textWidthOf(dt) + 22;                         // versija iškart po data (IŠMATUOTA)
+  drawString(vx, 505, "v" + String(FW_VERSION), LEFT);
   DrawBattery(620, 524);          // patraukta kairiau, kad įtampa nesuliptų su WiFi brūkšneliais
   DrawRSSI(878, 532, wifi_signal);
 }
@@ -1689,7 +1693,8 @@ void DrawStaleBar(const String& lastUpd, bool noWifi) {
 //   R1 Temperatūra     y  10..156   orų ikona(x150), „jaučiasi kaip"(18B,C x470), jutiminė(48B,C x470),
 //                                    termometras(12B,C x470); „ŠIANDIEN" skydelis x686..930 y16..142
 //                                    (centr. viršus..L1; 10B antr., maks/min 18B vienoj eil., vėjas+lietus 12B)
-//   Versija (v24+): apatinėje juostoje po laiko (x600 RIGHT), NE viršuje.
+//   Versija (v25+): apatinėje juostoje IŠKART po datos (x=150+textWidthOf(dt)+22, IŠMATUOTA);
+//                   laike bare sekundžių nerodom (dt = Date_str + " @ " + Time_str[:5]).
 //   L1 linija          y 158
 //   R2 Aprangos pat.   y 158..340   ŠIANDIEN RENKIS(10B y162), ikonos(x24..312, y186/212), patarimas(24B x2 x360, žingsnis56 @186), pastaba(12B VISADA po patarimo)
 //   L2 linija          y 340
