@@ -42,7 +42,7 @@
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
-#define FW_VERSION 26            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
+#define FW_VERSION 27            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -1656,8 +1656,10 @@ void DisplayBottomBar() {
   setFont(&OpenSans12B);
   drawString(15, 505, City, LEFT);
   drawString(150, 505, Date_str + "  @  " + Time_str.substring(0, 5), LEFT); // HH:MM be sekundžių
-  DrawBattery(655, 524);          // arčiau WiFi: ikona@680, tekstas@740..872 (blog. „100% 4.02v"=132px < WiFi juostų 886)
-  DrawRSSI(878, 532, wifi_signal);
+  // WiFi (dešiniausias juostos elementas) dešinį kraštą turi ties x940 - vertikaliai sulygiuotas su
+  // versija (R4 x940). Baterija - kairiau nuo WiFi (toj pačioj eilutėj, negali abi būti ties 940).
+  DrawBattery(655, 524);                                       // ikona@680, tekstas@740..~872 (prieš WiFi)
+  DrawRSSI(894, 532, wifi_signal);                             // WiFi juostos (x+8..x+46) baigiasi ties x940
 }
 
 // Nėra ryšio: prognozė ekrane FIZIŠKAI lieka (e-ink), perpiešiama TIK apatinė juosta (y490..540)
@@ -1792,7 +1794,7 @@ void DisplayWeather() {                          // 4.7" e-paper display is 960x
   DisplayForecastSection(320, 190);              // 3hr forecast boxes
   DisplayBottomBar();                            // Status baras apačioje (miestas+data+baterija+wifi)
   setFont(&OpenSans10B);
-  drawStringTop(953, 4, "v" + String(FW_VERSION), RIGHT); // versija - viršuje dešinėje (pilnas rež. neturi R4)
+  drawStringTop(940, 4, "v" + String(FW_VERSION), RIGHT); // versija - viršuje dešinėje (pilnas rež. neturi R4); x940 kaip kitur
 }
 
 //VSMOD
