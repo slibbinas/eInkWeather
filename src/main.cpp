@@ -42,7 +42,7 @@
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
-#define FW_VERSION 25            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
+#define FW_VERSION 26            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -1648,19 +1648,15 @@ void DrawTopButtonHint(bool wifeMode) {
                               : "spausk viršutinį mygtuką - PAPRASTAS VAIZDAS", LEFT);
 }
 
-// Apatinis baras: miestas + data + VERSIJA + baterija + WiFi (abu režimai), linija virš jo.
-// Versija (v25+) apatinėje juostoje IŠKART po datos - x apskaičiuojamas iš IŠMATUOTO datos pločio
-// (textWidthOf), ne spėjamas. Laike sekundžių NErodom (bare jos sustingusios 30 min - beprasmės),
-// tad data trumpesnė ir versija tikrai telpa prieš bateriją (ikona @645).
+// Apatinis baras: miestas + data + baterija + WiFi (abu režimai), linija virš jo.
+// Versija (v26+) rodoma korekcijų (R4) bloke dešinėje - žr. DisplayWifeMode (ten visada tuščia).
+// Laike sekundžių NErodom (bare jos sustingusios 30 min - beprasmės). Baterija pastumta arčiau WiFi.
 void DisplayBottomBar() {
   drawLine(5, 498, 955, 498, Grey);
   setFont(&OpenSans12B);
   drawString(15, 505, City, LEFT);
-  String dt = Date_str + "  @  " + Time_str.substring(0, 5);   // HH:MM be sekundžių
-  drawString(150, 505, dt, LEFT);
-  int vx = 150 + textWidthOf(dt) + 22;                         // versija iškart po data (IŠMATUOTA)
-  drawString(vx, 505, "v" + String(FW_VERSION), LEFT);
-  DrawBattery(620, 524);          // patraukta kairiau, kad įtampa nesuliptų su WiFi brūkšneliais
+  drawString(150, 505, Date_str + "  @  " + Time_str.substring(0, 5), LEFT); // HH:MM be sekundžių
+  DrawBattery(655, 524);          // arčiau WiFi: ikona@680, tekstas@740..872 (blog. „100% 4.02v"=132px < WiFi juostų 886)
   DrawRSSI(878, 532, wifi_signal);
 }
 
@@ -1693,15 +1689,14 @@ void DrawStaleBar(const String& lastUpd, bool noWifi) {
 //   R1 Temperatūra     y  10..156   orų ikona(x150), „jaučiasi kaip"(18B,C x470), jutiminė(48B,C x470),
 //                                    termometras(12B,C x470); „ŠIANDIEN" skydelis x686..930 y16..142
 //                                    (centr. viršus..L1; 10B antr., maks/min 18B vienoj eil., vėjas+lietus 12B)
-//   Versija (v25+): apatinėje juostoje IŠKART po datos (x=150+textWidthOf(dt)+22, IŠMATUOTA);
-//                   laike bare sekundžių nerodom (dt = Date_str + " @ " + Time_str[:5]).
+//   Versija (v26+): žmonos rež. - R4 dešinėje (x940 RIGHT y466); pilname rež. - viršuje dešinėje (x953 y4).
 //   L1 linija          y 158
 //   R2 Aprangos pat.   y 158..340   ŠIANDIEN RENKIS(10B y162), ikonos(x24..312, y186/212), patarimas(24B x2 x360, žingsnis56 @186), pastaba(12B VISADA po patarimo)
 //   L2 linija          y 340
 //   R3 Dienos eiga     y 344..430   antraštė(12B y346), temp(24B y378), ikona(y398); vert. skirtukai x320/640 y342..430
 //   L4 linija          y 434
-//   R4 Grįžt. ryšys    y 438..485   išvada RYŠKI(12B x30 y438), korekcija/datos(10B x30 y466)
-//   L3 + R5 baras      y 498..534   (DisplayBottomBar)
+//   R4 Grįžt. ryšys    y 438..485   išvada RYŠKI(12B x30 y438), korekcija/datos(10B x30 y466) + VERSIJA(10B RIGHT x940 y466)
+//   L3 + R5 baras      y 498..534   (DisplayBottomBar: data be sek., baterija @655 arčiau WiFi)
 void DisplayWifeMode() {
   // --- R1: temperatūros blokas (ikona + jutiminė centre; dešinėje "ŠIANDIEN" skydelis) ---
   DisplayConditionsSection(150, 84, WxConditions[0].Icon, LargeIcon);                 // orų ikona kairėje
@@ -1782,8 +1777,9 @@ void DisplayWifeMode() {
   setFont(&OpenSans10B);
   drawStringTop(30, 466, "Korekcija " + String(ChillBias, 1) + "°   ·   atsakyta " + dayToStr(FbLastDay)
                 + "   ·   kitas " + nextAsk, LEFT);                               // 466..485
+  drawStringTop(940, 466, "v" + String(FW_VERSION), RIGHT);                           // versija - R4 dešinėje (tuščia; korekcija baigiasi <=x593)
 
-  DisplayBottomBar();                                                                 // L3 + R5 (y498+; versija bare)
+  DisplayBottomBar();                                                                 // L3 + R5 (y498+)
 }
 
 void DisplayWeather() {                          // 4.7" e-paper display is 960x540 resolution
@@ -1794,7 +1790,9 @@ void DisplayWeather() {                          // 4.7" e-paper display is 960x
   DisplayMainWeatherSection(320, 80);
   DisplayWeatherIcon(810, 100);
   DisplayForecastSection(320, 190);              // 3hr forecast boxes
-  DisplayBottomBar();                            // Status baras apačioje (miestas+data+versija+baterija+wifi)
+  DisplayBottomBar();                            // Status baras apačioje (miestas+data+baterija+wifi)
+  setFont(&OpenSans10B);
+  drawStringTop(953, 4, "v" + String(FW_VERSION), RIGHT); // versija - viršuje dešinėje (pilnas rež. neturi R4)
 }
 
 //VSMOD

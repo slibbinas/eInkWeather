@@ -65,11 +65,9 @@ def bottom(s):
     s.hline(5,955,498,128)
     s.T(15,505,S["city"],12)
     dt=S["date"]+"  @  "+S["time"][:5]                         # HH:MM be sekundžių
-    s.T(150,505,dt,12)
-    vx=150+F[12].bounds(dt)[2]+22                              # versija po IŠMATUOTOS datos
-    s.T(vx,505,"v25",12)
-    s.d.rectangle((645,514,689,529),outline=0,width=2); s.d.rectangle((689,518,695,525),fill=0)  # baterijos ikona @645
-    s.T(705,505,"80% 4.02v",12); s.T(878,505,"WiFi",12)
+    s.T(150,505,dt,12)                                         # versija NEBE bare - ji R4 dešinėje
+    s.d.rectangle((680,514,724,529),outline=0,width=2); s.d.rectangle((724,518,730,525),fill=0)  # baterija @655 (ikona@680)
+    s.T(740,505,"80% 4.02v",12); s.T(878,505,"WiFi",12)
 
 def current():
     s=Screen()
@@ -122,6 +120,7 @@ def proposed(big_concl=False):
         s.hline(20,940,434,200)
         s.T(30,438,S["concl"],12)                    # isvada RYSKI (12B)
         s.T(30,466,"Korekcija "+S["corr"]+"°   ·   atsakyta "+S["ans"]+"   ·   kitas "+S["nxt"],10)
+        s.T(940,466,"v26",10,'R')                    # versija - R4 desineje
     else:
         for (lbl,t),x in zip(S["parts"],(160,480,800)):
             s.T(x,336,lbl,12,'C'); s.sicon(x-40,404); s.T(x+40,388,t+"°",24,'C')
