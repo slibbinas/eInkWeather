@@ -42,7 +42,7 @@
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
-#define FW_VERSION 22            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
+#define FW_VERSION 23            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -1615,10 +1615,10 @@ int FindDayPart(int startHour, int endHour) { // artimiausias prognozės įraša
 void DrawDayPart(int x, int yTop, String label, int idx) {
   if (idx < 0) return;
   setFont(&OpenSans12B);
-  drawStringTop(x, yTop, label, CENTER);
-  DisplayConditionsSection(x - 40, yTop + 66, WxForecast[idx].Icon, SmallIcon); // ikonos centras
-  setFont(&OpenSans24B);                                                         // didesnė temp. (v20)
-  drawStringTop(x + 40, yTop + 50, String(WxForecast[idx].Temperature, 0) + "°", CENTER);
+  drawStringTop(x, yTop, label, CENTER);                                         // yTop..yTop+24
+  DisplayConditionsSection(x - 40, yTop + 52, WxForecast[idx].Icon, SmallIcon);  // ikonos centras
+  setFont(&OpenSans24B);                                                         // didesnė temp. (v20+)
+  drawStringTop(x + 40, yTop + 32, String(WxForecast[idx].Temperature, 0) + "°", CENTER); // +32..+82
 }
 
 // Išskaido tekstą į eilutes pagal IŠMATUOTĄ pikselių plotį (ne pagal spėtą simbolių skaičių)
@@ -1695,12 +1695,12 @@ void DrawStaleBar(const String& lastUpd, bool noWifi) {
 //   R1 Temperatūra     y  10..156   orų ikona(x150), „jaučiasi kaip"(18B,C x470), jutiminė(48B,C x470),
 //                                    termometras(12B,C x470); „ŠIANDIEN" skydelis x686..930 y24..150
 //                                    (10B antr., maks/min 18B vienoj eil., vėjas+lietus 12B)
-//   L1 linija          y 162
-//   R2 Aprangos pat.   y 170..320   ŠIANDIEN RENKIS(10B), ikonos(x24..312, y182/208), patarimas(24B x2 x360), pastaba(12B, tik kai patarimas 1 eil.)
-//   L2 linija          y 326
-//   R3 Dienos eiga     y 332..428   antraštė(12B), ikona+temp(24B); vert. skirtukai x320/640
+//   L1 linija          y 158
+//   R2 Aprangos pat.   y 158..340   ŠIANDIEN RENKIS(10B y162), ikonos(x24..312, y186/212), patarimas(24B x2 x360, žingsnis56 @186), pastaba(12B VISADA po patarimo)
+//   L2 linija          y 340
+//   R3 Dienos eiga     y 344..430   antraštė(12B y346), temp(24B y378), ikona(y398); vert. skirtukai x320/640 y342..430
 //   L4 linija          y 434
-//   R4 Grįžt. ryšys    y 440..490   išvada RYŠKI(12B x30), korekcija/datos(10B x30)
+//   R4 Grįžt. ryšys    y 438..485   išvada RYŠKI(12B x30 y438), korekcija/datos(10B x30 y466)
 //   L3 + R5 baras      y 498..534   (DisplayBottomBar)
 void DisplayWifeMode() {
   // --- R1: temperatūros blokas (ikona + jutiminė centre; dešinėje "ŠIANDIEN" skydelis) ---
@@ -1732,35 +1732,35 @@ void DisplayWifeMode() {
   setFont(&OpenSans12B);
   drawStringTop(808, 92,  "Vėjas " + String(WxConditions[0].Windspeed, 0) + " m/s " + WindDegToOrdinalDirection(WxConditions[0].Winddir), CENTER); // 92..120
   drawStringTop(808, 120, "Lietus " + String((int)round(pop * 100)) + "%", CENTER);   // 120..148
-  drawLine(20, 162, 940, 162, Black);                                                 // L1
+  drawLine(20, 158, 940, 158, Black);                                                 // L1
 
   // --- R2: aprangos patarimas (ikonos kairėje, tekstas fiksuotoje zonoje) ---
   ClothingAdvice adv = GetClothingAdvice();
   // Adaptyvu: pagrindinis drabužis DIDELIS (icons[0], 124px), aksesuarai maži (icons[1..], 72px)
-  int gy = 162 + (164 - ICON_G_H) / 2;                                               // drabužis centr. juostoje 162..326 (y182)
+  int gy = 186;                                                                      // drabužis juostoje 158..340
   DrawIcon(24, gy, adv.icons[0], ICON_G_W, ICON_G_H);                                // x24..148
-  int ay = 162 + (164 - ICON_A_H) / 2, ax = 24 + ICON_G_W + 12;                      // aksesuarai: y208, pradžia x160
+  int ay = 212, ax = 24 + ICON_G_W + 12;                                             // aksesuarai: y212, pradžia x160
   for (int i = 1; i < adv.n; i++) { DrawIcon(ax, ay, adv.icons[i], ICON_A_W, ICON_A_H); ax += ICON_A_W + 8; } // x160,240 (<tx=360)
   const int tx = 360, tw = 580;                                                       // teksto zona x 360..940
   setFont(&OpenSans10B);
-  drawStringTop(tx, 170, "ŠIANDIEN RENKIS", LEFT);                                     // 170..189
-  setFont(&OpenSans24B);                                                              // patarimas RYŠKUS (v22; visos frazės telpa ≤2 eil. per tw=580)
+  drawStringTop(tx, 162, "ŠIANDIEN RENKIS", LEFT);                                     // 162..181
+  setFont(&OpenSans24B);                                                              // patarimas RYŠKUS (v23; visos frazės telpa ≤2 eil. per tw=580; žingsnis 56 - eil. ink ~50)
   String lines[2];
   int n = WrapMeasured(adv.text, tw, lines, 2);
-  for (int i = 0; i < n; i++) drawStringTop(tx, 198 + i * 66, lines[i], LEFT);        // 198..246, 264..312
-  if (n == 1 && adv.note.length()) {                                                  // pastaba tik kai patarimas 1 eil. (2 eil. užpildo zoną)
+  for (int i = 0; i < n; i++) drawStringTop(tx, 186 + i * 56, lines[i], LEFT);        // 186..236, 242..292
+  if (adv.note.length()) {                                                           // pastaba VISADA - po paskutinės patarimo eilutės
     setFont(&OpenSans12B);
     String nl[1];
-    if (WrapMeasured(adv.note, tw, nl, 1) > 0) drawStringTop(tx, 272, nl[0], LEFT);   // 272..300
+    if (WrapMeasured(adv.note, tw, nl, 1) > 0) drawStringTop(tx, 186 + n * 56 + 6, nl[0], LEFT); // 1eil->248; 2eil->304..328
   }
-  drawLine(20, 326, 940, 326, Black);                                                 // L2
+  drawLine(20, 340, 940, 340, Black);                                                 // L2
 
   // --- R3: dienos eiga (didesnės temperatūros, 24B) ---
-  DrawDayPart(160, 332, "Rytas",   FindDayPart(6, 10));
-  DrawDayPart(480, 332, "Diena",   FindDayPart(11, 16));
-  DrawDayPart(800, 332, "Vakaras", FindDayPart(17, 22));
-  drawLine(320, 328, 320, 428, LightGrey);
-  drawLine(640, 328, 640, 428, LightGrey);
+  DrawDayPart(160, 346, "Rytas",   FindDayPart(6, 10));
+  DrawDayPart(480, 346, "Diena",   FindDayPart(11, 16));
+  DrawDayPart(800, 346, "Vakaras", FindDayPart(17, 22));
+  drawLine(320, 342, 320, 430, LightGrey);
+  drawLine(640, 342, 640, 430, LightGrey);
 
   // --- R4: išvada RYŠKI (sava 12B eilutė) + korekcija/datos maža 10B eilutė ---
   auto dayToStr = [](int dayNum) -> String {                                          // time/86400 -> "MM-DD"
@@ -1778,10 +1778,10 @@ void DisplayWifeMode() {
   setFont(&OpenSans12B);
   String concl = FeedbackConclusion();
   if (concl.length()) concl.setCharAt(0, toupper(concl.charAt(0)));
-  drawStringTop(30, 440, concl, LEFT);                                                // 440..466
+  drawStringTop(30, 438, concl, LEFT);                                                // 438..462
   setFont(&OpenSans10B);
-  drawStringTop(30, 470, "Korekcija " + String(ChillBias, 1) + "°   ·   atsakyta " + dayToStr(FbLastDay)
-                + "   ·   kitas " + nextAsk, LEFT);                               // 470..490
+  drawStringTop(30, 466, "Korekcija " + String(ChillBias, 1) + "°   ·   atsakyta " + dayToStr(FbLastDay)
+                + "   ·   kitas " + nextAsk, LEFT);                               // 466..485
 
   DisplayBottomBar();                                                                 // L3 + R5 (y498+)
   DrawVersionTag();                                                                   // VER: viršus dešinėje

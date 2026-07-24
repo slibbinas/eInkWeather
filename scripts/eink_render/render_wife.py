@@ -64,7 +64,7 @@ S=dict(city="Vilnius",date="2026-04-14",time="20:00",feels="6",term="8",dmax="11
 def bottom(s):
     s.hline(5,955,498,128)
     s.T(15,505,S["city"],12); s.T(150,505,S["date"]+"  @  "+S["time"],12)
-    s.T(620,505,"84% 4.02V",12); s.T(878,505,"WiFi",12); s.T(953,4,"v22",10,'R')
+    s.T(620,505,"84% 4.02V",12); s.T(878,505,"WiFi",12); s.T(953,4,"v23",10,'R')
 
 def current():
     s=Screen()
@@ -100,25 +100,23 @@ def proposed(big_concl=False):
     s.tri(736,62,True);  s.T(752,52,S["dmax"]+"°",18)
     s.tri(838,78,False); s.T(852,52,S["dmin"]+"°",18)
     s.T(808,92,"Vėjas "+S["wind"],12,'C'); s.T(808,120,"Lietus "+S["pop"]+"%",12,'C')
-    s.hline(20,940,162)
-    s.icon(24,184,S["main"],124,124)
+    s.hline(20,940,158)                                    # v23 layout
+    s.icon(24,186,S["main"],124,124)
     ax=160
-    for a in S["acc"]: s.icon(ax,208,a,72,72); ax+=80
-    s.T(360,170,"ŠIANDIEN RENKIS",10)
-    _lines=wrap_measured(F[24],S["adv"],580,2)              # patarimas 24B (v22)
-    for i,ln in enumerate(_lines): s.T(360,198+i*66,ln,24)
-    if len(_lines)==1:                                      # pastaba tik kai patarimas 1 eil.
-        nl=wrap_measured(F[12],S["note"],580,1)
-        if nl: s.T(360,272,nl[0],12)
-    s.hline(20,940,326)
+    for a in S["acc"]: s.icon(ax,212,a,72,72); ax+=80
+    s.T(360,162,"ŠIANDIEN RENKIS",10)
+    _lines=wrap_measured(F[24],S["adv"],580,2)              # patarimas 24B (žingsnis 56)
+    for i,ln in enumerate(_lines): s.T(360,186+i*56,ln,24)
+    nl=wrap_measured(F[12],S["note"],580,1)                 # pastaba VISADA po patarimo
+    if nl: s.T(360,186+len(_lines)*56+6,nl[0],12)
+    s.hline(20,940,340)
     if big_concl:
-        # dienos eiga siek tiek auksciau; isvada - SAVA 12B eilute; korekcija/data - maza 10B
         for (lbl,t),x in zip(S["parts"],(160,480,800)):
-            s.T(x,332,lbl,12,'C'); s.sicon(x-40,398); s.T(x+40,382,t+"°",24,'C')
-        s.vline(328,428,320,200); s.vline(328,428,640,200)
+            s.T(x,346,lbl,12,'C'); s.sicon(x-40,398); s.T(x+40,378,t+"°",24,'C')
+        s.vline(342,430,320,200); s.vline(342,430,640,200)
         s.hline(20,940,434,200)
-        s.T(30,440,S["concl"],12)                    # isvada RYSKI (12B)
-        s.T(30,470,"Korekcija "+S["corr"]+"°   ·   atsakyta "+S["ans"]+"   ·   kitas "+S["nxt"],10)
+        s.T(30,438,S["concl"],12)                    # isvada RYSKI (12B)
+        s.T(30,466,"Korekcija "+S["corr"]+"°   ·   atsakyta "+S["ans"]+"   ·   kitas "+S["nxt"],10)
     else:
         for (lbl,t),x in zip(S["parts"],(160,480,800)):
             s.T(x,336,lbl,12,'C'); s.sicon(x-40,404); s.T(x+40,388,t+"°",24,'C')
