@@ -42,7 +42,7 @@
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
-#define FW_VERSION 20            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
+#define FW_VERSION 21            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -414,6 +414,8 @@ void loop() {
   // Nothing to do here
 }
 
+void DrawStaleBar(const String& lastUpd, bool noWifi); // apibrėžta žemiau (dalinis apatinės juostos atnaujinimas)
+
 void setup() {
   InitialiseSystem();
   prefs.begin("eink", false);
@@ -440,7 +442,10 @@ void setup() {
   // Mygtukas ar įjungimas -> atnaujinti bet kada; tik planinis (taimerio) žadinimas paiso nakties lango
   bool forceRefresh = (wakeCause != ESP_SLEEP_WAKEUP_TIMER);
   ReadBattery();
+  bool refreshed = false;   // ar sėkmingai perpiešėm ŠVIEŽIĄ prognozę (arba tyčia nieko - naktis)
+  bool wifiOk    = false;
   if (StartWiFi() == WL_CONNECTED && SetupTime() == true) {
+    wifiOk = true;
     bool WakeUp = forceRefresh;
     if (!WakeUp) {
       if (WakeupHour > SleepHour)
@@ -448,7 +453,9 @@ void setup() {
       else
         WakeUp = (CurrentHour >= WakeupHour && CurrentHour <= SleepHour);
     }
-    if (WakeUp) {
+    if (!WakeUp) {
+      refreshed = true;  // naktis: sąmoningai neatnaujinam - tai NE klaida, ženklo nerodom
+    } else {
       byte Attempts = 1;
       bool RxWeather  = false;
       bool RxForecast = false;
@@ -473,22 +480,36 @@ void setup() {
         else          DisplayWeather();  // Pilnas ekranas su grafikais
         edp_update();       // Update the display to show the information
         epd_poweroff_all(); // Switch off all power to EPD
+        refreshed = true;
+        prefs.putString("lastUpd", Time_str);   // paskutinio sėkmingo atnaujinimo laikas
+        prefs.putBool("everDrew", true);        // bent kartą turim ką rodyti (e-ink išlaiko)
+        prefs.putBool("staleShown", false);     // ryšys atgavo - „sena" būsena nuimta
       }
     }
   }
-  else if (wakeCause != ESP_SLEEP_WAKEUP_TIMER) {
-    // Šaltas paleidimas ar mygtukas, o prisijungti nepavyko: parodom, kas vyksta ir ką daryti.
-    // Portalas automatiškai nebeatidaromas - tik sąmoningai (mygtukas 3-8 s). Taimerio
-    // pabudimams ekrano nekeičiam (naktį/router'io dingimui - tyliai bandom kas 30 min.)
-    epd_poweron();
-    ClearScreen();
-    setFont(&OpenSans18B);
-    drawStringTop(SCREEN_WIDTH / 2, 150, "Nepavyko prisijungti prie WiFi", CENTER);
-    setFont(&OpenSans12B);
-    drawStringTop(SCREEN_WIDTH / 2, 240, "WiFi nustatymui palaikykite mygtuką 3-8 sek.", CENTER);
-    drawStringTop(SCREEN_WIDTH / 2, 280, "Kitaip bandysiu jungtis vėl kas 30 min.", CENTER);
-    edp_update();
-    epd_poweroff_all();
+  // Norėjom šviežios prognozės, bet negavom (WiFi/laikas/OWM). E-ink FIZIŠKAI išlaiko paskutinę
+  // prognozę - NEtrinam jos. Vietoj pilno lango perpiešiam TIK apatinę juostą su statuso ženklu.
+  // Portalas automatiškai NEatsidaro - tik sąmoningai (mygtukas 3-8 s).
+  if (!refreshed) {
+    if (prefs.getBool("everDrew", false)) {
+      // Mygtuko/šaltas žadinimas - visada perpiešiam ženklą (aiški reakcija);
+      // taimerio žadinimas - tik VIENĄ kartą (baterija), kol ryšys neatgaus.
+      if (forceRefresh || !prefs.getBool("staleShown", false)) {
+        DrawStaleBar(prefs.getString("lastUpd", "?"), !wifiOk);
+        prefs.putBool("staleShown", true);
+      }
+    } else if (wakeCause != ESP_SLEEP_WAKEUP_TIMER) {
+      // Nieko dar nerodyta (pirmas startas / po „Erase") - pilnas setup langas.
+      epd_poweron();
+      ClearScreen();
+      setFont(&OpenSans18B);
+      drawStringTop(SCREEN_WIDTH / 2, 150, "Nepavyko prisijungti prie WiFi", CENTER);
+      setFont(&OpenSans12B);
+      drawStringTop(SCREEN_WIDTH / 2, 240, "WiFi nustatymui palaikykite mygtuką 3-8 sek.", CENTER);
+      drawStringTop(SCREEN_WIDTH / 2, 280, "Kitaip bandysiu jungtis vėl kas 30 min.", CENTER);
+      edp_update();
+      epd_poweroff_all();
+    }
   }
   BeginSleep();
 }
@@ -1643,6 +1664,30 @@ void DisplayBottomBar() {
   drawString(150, 505, Date_str + "  @  " + Time_str, LEFT);
   DrawBattery(620, 524);          // patraukta kairiau, kad įtampa nesuliptų su WiFi brūkšneliais
   DrawRSSI(878, 532, wifi_signal);
+}
+
+// Nėra ryšio: prognozė ekrane FIZIŠKAI lieka (e-ink), perpiešiama TIK apatinė juosta (y490..540)
+// daliniu atnaujinimu (epd_draw_grayscale_image pilno pločio regionui - offset framebuffer'yje).
+// Nekeičiam viso ekrano -> greita, nemirga, taupo bateriją, prognozė nedingsta.
+void DrawStaleBar(const String& lastUpd, bool noWifi) {
+  const int Y = 490, H = SCREEN_HEIGHT - Y;                 // 490..540 (50 px)
+  fillRect(0, Y, SCREEN_WIDTH, H, White);                   // baltas fonas buferyje (tik juostai)
+  drawLine(5, Y + 6, 955, Y + 6, Black);                    // skirtukas nuo prognozės
+  int tx = 24, ty = Y + 14;                                 // įspėjimo trikampis
+  drawLine(tx, ty, tx - 13, ty + 24, Black);
+  drawLine(tx, ty, tx + 13, ty + 24, Black);
+  drawLine(tx - 13, ty + 24, tx + 13, ty + 24, Black);
+  fillRect(tx - 1, ty + 7, 3, 9, Black);                    // šauktuko brūkšnys
+  fillRect(tx - 1, ty + 18, 3, 3, Black);                   // šauktuko taškas
+  setFont(&OpenSans12B);
+  drawStringTop(52, Y + 15, String(noWifi ? "Nėra WiFi" : "Nėra interneto")
+                + " · rodoma paskutinė (" + lastUpd + ") prognozė", LEFT);
+  drawStringTop(952, Y + 15, "laikyk 3-8 s", RIGHT);        // užuomina nustatymui
+  epd_poweron();
+  Rect_t area = { 0, Y, SCREEN_WIDTH, H };
+  epd_clear_area(area);                                     // fiziškai nuvalo seną juostą (be ghosting)
+  epd_draw_grayscale_image(area, framebuffer + Y * (EPD_WIDTH / 2)); // pilno pločio regionas -> stride sutampa
+  epd_poweroff_all();
 }
 
 // REGIONŲ LENTELĖ (960x540, v20). Aukščiai IŠMATUOTI (get_text_bounds), žingsnis = šrifto advance_y.
