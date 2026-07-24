@@ -42,7 +42,7 @@
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
-#define FW_VERSION 23            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
+#define FW_VERSION 24            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -1648,20 +1648,14 @@ void DrawTopButtonHint(bool wifeMode) {
                               : "spausk viršutinį mygtuką - PAPRASTAS VAIZDAS", LEFT);
 }
 
-// Apatinis baras: miestas + data + WiFi + baterija (abu režimai), linija virš jo
-// Versijos žymė viršutiniame dešiniame kampe. Region VER: x 908..953, y 4..24 (10B).
-// Laisva zona ABIEJUOSE ekranuose - žr. kolizijų patikrą (dešinio stulpelio tekstai baigiasi
-// x<=766; pilno ekrano ikona viršuje y>=40, dešinėje x<=880). Kviečiama paskutinė - font state nesvarbus.
-void DrawVersionTag() {
-  setFont(&OpenSans10B);
-  drawStringTop(953, 4, "v" + String(FW_VERSION), RIGHT);
-}
-
+// Apatinis baras: miestas + data + VERSIJA + baterija + WiFi (abu režimai), linija virš jo.
+// Versija (v24+) perkelta iš viršaus į apatinę juostą - tarp laiko ir baterijos (tuščia zona).
 void DisplayBottomBar() {
   drawLine(5, 498, 955, 498, Grey);
   setFont(&OpenSans12B);
   drawString(15, 505, City, LEFT);
   drawString(150, 505, Date_str + "  @  " + Time_str, LEFT);
+  drawString(600, 505, "v" + String(FW_VERSION), RIGHT);   // versija - po laiko, prieš bateriją (dešiniuoju kraštu x600)
   DrawBattery(620, 524);          // patraukta kairiau, kad įtampa nesuliptų su WiFi brūkšneliais
   DrawRSSI(878, 532, wifi_signal);
 }
@@ -1693,8 +1687,9 @@ void DrawStaleBar(const String& lastUpd, bool noWifi) {
 // REGIONŲ LENTELĖ (960x540, v20). Aukščiai IŠMATUOTI (get_text_bounds), žingsnis = šrifto advance_y.
 // Šriftų advance_y: 8B=22, 10B=28, 12B=33, 18B=50, 24B=67, 48B=133 (48B "17°" realus h=71).
 //   R1 Temperatūra     y  10..156   orų ikona(x150), „jaučiasi kaip"(18B,C x470), jutiminė(48B,C x470),
-//                                    termometras(12B,C x470); „ŠIANDIEN" skydelis x686..930 y24..150
-//                                    (10B antr., maks/min 18B vienoj eil., vėjas+lietus 12B)
+//                                    termometras(12B,C x470); „ŠIANDIEN" skydelis x686..930 y16..142
+//                                    (centr. viršus..L1; 10B antr., maks/min 18B vienoj eil., vėjas+lietus 12B)
+//   Versija (v24+): apatinėje juostoje po laiko (x600 RIGHT), NE viršuje.
 //   L1 linija          y 158
 //   R2 Aprangos pat.   y 158..340   ŠIANDIEN RENKIS(10B y162), ikonos(x24..312, y186/212), patarimas(24B x2 x360, žingsnis56 @186), pastaba(12B VISADA po patarimo)
 //   L2 linija          y 340
@@ -1721,17 +1716,17 @@ void DisplayWifeMode() {
   }
   float pop = max(WxForecast[0].Pop, max(WxForecast[1].Pop, WxForecast[2].Pop));
   // "ŠIANDIEN" skydelis: x 686..930, y 24..150 (po v20 žyme)
-  drawRoundRect(686, 24, 244, 126, 12, Grey);
+  drawRoundRect(686, 16, 244, 126, 12, Grey);                                         // centr. viršus..L1(158): y16..142
   setFont(&OpenSans10B);
-  drawStringTop(808, 30, "ŠIANDIEN", CENTER);                                         // 30..50
+  drawStringTop(808, 22, "ŠIANDIEN", CENTER);                                         // 22..42
   setFont(&OpenSans18B);
-  fillTriangle(736, 62, 726, 82, 746, 82, Black);                                     // ▲ dienos maks
-  drawStringTop(752, 52, String(dMax, 0) + "°", LEFT);                                // 52..94
-  fillTriangle(838, 78, 828, 58, 848, 58, Black);                                     // ▼ dienos min
-  drawStringTop(852, 52, String(dMin, 0) + "°", LEFT);
+  fillTriangle(736, 54, 726, 74, 746, 74, Black);                                     // ▲ dienos maks
+  drawStringTop(752, 44, String(dMax, 0) + "°", LEFT);                                // 44..86
+  fillTriangle(838, 70, 828, 50, 848, 50, Black);                                     // ▼ dienos min
+  drawStringTop(852, 44, String(dMin, 0) + "°", LEFT);
   setFont(&OpenSans12B);
-  drawStringTop(808, 92,  "Vėjas " + String(WxConditions[0].Windspeed, 0) + " m/s " + WindDegToOrdinalDirection(WxConditions[0].Winddir), CENTER); // 92..120
-  drawStringTop(808, 120, "Lietus " + String((int)round(pop * 100)) + "%", CENTER);   // 120..148
+  drawStringTop(808, 84,  "Vėjas " + String(WxConditions[0].Windspeed, 0) + " m/s " + WindDegToOrdinalDirection(WxConditions[0].Winddir), CENTER); // 84..112
+  drawStringTop(808, 112, "Lietus " + String((int)round(pop * 100)) + "%", CENTER);   // 112..140
   drawLine(20, 158, 940, 158, Black);                                                 // L1
 
   // --- R2: aprangos patarimas (ikonos kairėje, tekstas fiksuotoje zonoje) ---
@@ -1783,8 +1778,7 @@ void DisplayWifeMode() {
   drawStringTop(30, 466, "Korekcija " + String(ChillBias, 1) + "°   ·   atsakyta " + dayToStr(FbLastDay)
                 + "   ·   kitas " + nextAsk, LEFT);                               // 466..485
 
-  DisplayBottomBar();                                                                 // L3 + R5 (y498+)
-  DrawVersionTag();                                                                   // VER: viršus dešinėje
+  DisplayBottomBar();                                                                 // L3 + R5 (y498+; versija bare)
 }
 
 void DisplayWeather() {                          // 4.7" e-paper display is 960x540 resolution
@@ -1795,8 +1789,7 @@ void DisplayWeather() {                          // 4.7" e-paper display is 960x
   DisplayMainWeatherSection(320, 80);
   DisplayWeatherIcon(810, 100);
   DisplayForecastSection(320, 190);              // 3hr forecast boxes
-  DisplayBottomBar();                            // Status baras apačioje (miestas+data+wifi+baterija)
-  DrawVersionTag();                              // VER: viršus dešinėje
+  DisplayBottomBar();                            // Status baras apačioje (miestas+data+versija+baterija+wifi)
 }
 
 //VSMOD

@@ -64,7 +64,8 @@ S=dict(city="Vilnius",date="2026-04-14",time="20:00",feels="6",term="8",dmax="11
 def bottom(s):
     s.hline(5,955,498,128)
     s.T(15,505,S["city"],12); s.T(150,505,S["date"]+"  @  "+S["time"],12)
-    s.T(620,505,"84% 4.02V",12); s.T(878,505,"WiFi",12); s.T(953,4,"v23",10,'R')
+    s.T(600,505,"v24",12,'R')                                  # versija - bare po laiko (v24+)
+    s.T(620,505,"84% 4.02V",12); s.T(878,505,"WiFi",12)
 
 def current():
     s=Screen()
@@ -95,11 +96,11 @@ def proposed(big_concl=False):
     s.wreal(150,84)                                  # TIKRA oru ikona (Rain LargeIcon)
     s.T(470,10,"jaučiasi kaip",18,'C'); s.T(470,52,S["feels"]+"°",48,'C')
     s.T(470,128,"termometras rodo "+S["term"]+"°",12,'C')
-    s.rrect(686,24,930,150,128,12)
-    s.T(808,30,"ŠIANDIEN",10,'C')
-    s.tri(736,62,True);  s.T(752,52,S["dmax"]+"°",18)
-    s.tri(838,78,False); s.T(852,52,S["dmin"]+"°",18)
-    s.T(808,92,"Vėjas "+S["wind"],12,'C'); s.T(808,120,"Lietus "+S["pop"]+"%",12,'C')
+    s.rrect(686,16,930,142,128,12)                            # skydelis centr. viršus..L1
+    s.T(808,22,"ŠIANDIEN",10,'C')
+    s.tri(736,54,True);  s.T(752,44,S["dmax"]+"°",18)
+    s.tri(838,70,False); s.T(852,44,S["dmin"]+"°",18)
+    s.T(808,84,"Vėjas "+S["wind"],12,'C'); s.T(808,112,"Lietus "+S["pop"]+"%",12,'C')
     s.hline(20,940,158)                                    # v23 layout
     s.icon(24,186,S["main"],124,124)
     ax=160
