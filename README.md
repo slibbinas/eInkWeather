@@ -83,6 +83,10 @@ primenamos patarimo tekste („Po pietų iki X° – renkis sluoksniais" / „Va
   ištrinamas (nebent įjungta `/history`), kad liktų tik naujausias.
 - Baterijai nusekus iki 10 % adminas gauna perspėjimą 🪫.
 
+<p align="center">
+  <img src="assets/telegram.png" alt="Telegram: vakarinis klausimas su atsiliepimo mygtukais" width="320">
+</p>
+
 ## Savybės
 
 | | |
@@ -118,6 +122,18 @@ naudojama: **GPIO21** — režimo/nustatymų mygtukas, **GPIO14** — baterijos 
 Išsamiau — [NAUDOTOJO_VADOVAS.md](NAUDOTOJO_VADOVAS.md). Gražus naudotojo manualas —
 [docs/manualas.html](docs/manualas.html) (atverti naršyklėje; taip pat gaunamas Telegram
 komanda `/vadovas`).
+
+## OTA — atnaujinimas per WiFi
+
+Firmware galima atnaujinti belaidžiu būdu, be USB laido: laikant mygtuką ≥8 s įrenginys pereina
+į OTA režimą, o kompiuteryje paleidus `pio run -e ota -t upload` naujas firmware siunčiamas per
+tinklą. Įkėlimo eiga rodoma **progreso juosta pačiame e-ink ekrane** (dalinis atnaujinimas per
+`epd_push_pixels`), tad matyti, kiek liko. OTA lange dar kartą spustelėjus mygtuką — paleidžiamas
+Telegram ryšio testas.
+
+<p align="center">
+  <img src="assets/ota.png" alt="OTA įkėlimo progreso juosta e-ink ekrane" width="420">
+</p>
 
 ## Interaktyvus prototipas
 
@@ -195,6 +211,10 @@ from real vector (iconify) icons, identical to the [mockup](docs/mockup_zmonos.p
 
 No external server required — the ESP32 talks to the Telegram Bot API directly and picks up
 replies on its next wake-up.
+
+<p align="center">
+  <img src="assets/telegram.png" alt="Telegram: the evening question with feedback buttons" width="320">
+</p>
 
 ## Features
 
