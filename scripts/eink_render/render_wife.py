@@ -53,13 +53,13 @@ class Screen:
         s.d.rectangle((cx-20,cy+2,cx+20,cy+16),fill=255)
         s.d.line((cx-20,cy+14,cx+20,cy+14),fill=0,width=2)
 
-S=dict(city="Vilnius",date="Penktadienis, 24-07-2026",time="13:55:07",feels="6",term="8",dmax="11",dmin="3",
-       wind="9 m/s PV",pop="40",adv="Paltas ir šiltas šalikas nepakenks",
-       note="Vakare atvės iki 3° - pasiimk šiltesnį.  Pasiimk skėtį!",
-       corr="-2.0",ask="04-14",ans="04-13",nxt="rytoj 20:00",
+S=dict(city="Vilnius",date="Pirmadienis, 01-09-2026",time="13:55:07",feels="21",term="22",dmax="22",dmin="12",
+       wind="9 m/s PPR",pop="98",adv="Lengva striukė ir skėtis",
+       note="Diena lietinga - būtinai pasiimk skėtį!",
+       corr="-2.0",ask="09-01",ans="08-31",nxt="rytoj 20:00",
        concl="Dažniau jaučiate šaltį - renku šilčiau",
        main="icon_paltas",acc=["icon_salikas","icon_sketis"],
-       parts=[("Rytas","5"),("Diena","11"),("Vakaras","4")])
+       parts=[("Rytas","12"),("Diena","22"),("Vakaras","15")])
 
 def bottom(s):
     s.hline(5,955,498,128)
@@ -128,25 +128,75 @@ def proposed(big_concl=False):
         s.T(24,474,"Korekcija "+S["corr"]+"°  ·  atsakyta "+S["ans"]+"  ·  kitas "+S["nxt"]+"  ·  "+S["concl"],10)
     bottom(s); return s.img
 
+# ---- R1..R4 bendra (vienoda abiem versijom): oru ikona, jutimine, R2 apranga, R4 grizt. rysys ----
+def _r1_left(s):
+    s.wreal(150,84)
+    s.T(470,10,"jaučiasi kaip",18,'C'); s.T(470,52,S["feels"]+"°",48,'C')
+    s.T(470,128,"termometras rodo "+S["term"]+"°",12,'C')
+def _r2(s):
+    s.icon(24,186,S["main"],124,124)
+    ax=160
+    for a in S["acc"]: s.icon(ax,212,a,72,72); ax+=80
+    s.T(360,162,"ŠIANDIEN RENKIS",10)
+    _lines=wrap_measured(F[24],S["adv"],580,2)
+    for i,ln in enumerate(_lines): s.T(360,186+i*56,ln,24)
+    nl=wrap_measured(F[12],S["note"],580,1)
+    if nl: s.T(360,186+len(_lines)*56+6,nl[0],12)
+    s.hline(20,940,340)
+def _r4(s,ver):
+    s.hline(20,940,434,200)
+    s.T(30,438,S["concl"],12)
+    s.T(30,466,"Korekcija "+S["corr"]+"°   ·   atsakyta "+S["ans"]+"   ·   kitas "+S["nxt"],10)
+    s.T(940,466,ver,10,'R')
+
+def v27f():  # TIKRAS dabartinis v27 (remelis; Vejas/Lietus centruoti; dienos dalys per vidury)
+    s=Screen(); _r1_left(s)
+    s.rrect(686,16,930,142,128,12)
+    s.T(808,22,"ŠIANDIEN",10,'C')
+    s.tri(736,54,True);  s.T(752,44,S["dmax"]+"°",18)
+    s.tri(838,70,False); s.T(852,44,S["dmin"]+"°",18)
+    s.T(808,84,"Vėjas "+S["wind"],12,'C'); s.T(808,112,"Lietus "+S["pop"]+"%",12,'C')
+    s.hline(20,940,158)
+    _r2(s)
+    for (lbl,t),x in zip(S["parts"],(160,480,800)):     # dienos dalys: antraste+temp CENTER
+        s.T(x,346,lbl,12,'C'); s.sicon(x-40,398); s.T(x+40,378,t+"°",24,'C')
+    s.vline(342,430,320,200); s.vline(342,430,640,200)
+    _r4(s,"v27"); bottom(s); return s.img
+
+def v28():  # SIULOMA: be remelio (vert. skirtukas), Vejas/Lietus KAIRE, dienos dalys KAIRE virs temp.
+    s=Screen(); _r1_left(s)
+    LX=702
+    s.vline(12,150,680,128)                              # vertikalus skirtukas (vietoj remelio)
+    s.T(LX,14,"ŠIANDIEN",10)                             # KAIRE
+    s.tri(LX+9,52,True);   s.T(LX+26,44,S["dmax"]+"°",18)
+    s.tri(LX+120,72,False);s.T(LX+136,44,S["dmin"]+"°",18)
+    s.T(LX,96,"Vėjas "+S["wind"],12); s.T(LX,124,"Lietus "+S["pop"]+"%",12)  # KAIRE - abu prasideda vienodai
+    s.hline(20,940,158)
+    _r2(s)
+    for (lbl,t),x in zip(S["parts"],(160,480,800)):     # dienos dalys: antraste+temp KAIRE (tx=x+8)
+        tx=x+8
+        s.T(tx,346,lbl,12); s.sicon(x-44,398); s.T(tx,378,t+"°",24)
+    s.vline(342,430,320,200); s.vline(342,430,640,200)
+    _r4(s,"v28"); bottom(s); return s.img
+
 if __name__=="__main__":
- panA=proposed(False); panB=proposed(True)
+ panA=v27f(); panB=v28()
  SC=3
  def up(im): return im.resize((W*SC,H*SC),Image.NEAREST)
  a3,b3=up(panA),up(panB)
- pad,top,gap=30,72,92; cw=W*SC
+ pad,top,gap=30,78,96; cw=W*SC
  canvas=Image.new("L",(cw+2*pad, top+H*SC+gap+top+H*SC+pad),255)
- cd=ImageDraw.Draw(canvas); big=ImageFont.truetype(r"C:\Windows\Fonts\segoeuib.ttf",42)
- cd.text((pad,16),"A) v2b + TIKRA oru ikona (Rain LargeIcon portuota)  -  meta viena rami 10B eilute",font=big,fill=0)
+ cd=ImageDraw.Draw(canvas); big=ImageFont.truetype(r"C:\Windows\Fonts\segoeuib.ttf",44)
+ cd.text((pad,18),"PRIES (v27)  -  remelis; Vejas/Lietus centruoti; Rytas/Diena/Vakaras per vidury",font=big,fill=0)
  canvas.paste(a3,(pad,top)); cd.rectangle((pad-1,top-1,pad+cw,top+H*SC),outline=0,width=2)
  y2=top+H*SC+gap
- cd.text((pad,y2-52),"B) v2c + TIKRA ikona  -  ISVADA sava 12B eilute (ryskesne), korekcija/data maza 10B",font=big,fill=0)
+ cd.text((pad,y2-58),"PO (v28)  -  vert. skirtukas; Vejas/Lietus is kaires; antrastes virs temp. pradzios",font=big,fill=0)
  canvas.paste(b3,(pad,y2)); cd.rectangle((pad-1,y2-1,pad+cw,y2+H*SC),outline=0,width=2)
  OUTDIR=os.path.dirname(os.path.abspath(__file__))
- out=os.path.join(OUTDIR,"wife_variants.png")
+ out=os.path.join(OUTDIR,"wife_v28_pries_po.png")
  canvas.save(out); print("saved",out,canvas.size)
- # GALUTINIS vienas ekranas (kaip idiegta v20), su remeliu
  fin=panB.resize((W*4,H*4),Image.NEAREST)
  fc=Image.new("L",(W*4+2*20, H*4+2*20),255); ImageDraw.Draw(fc).rectangle((19,19,20+W*4,20+H*4),outline=0,width=2)
  fc.paste(fin,(20,20))
- fout=os.path.join(OUTDIR,"wife_final_v20.png")
+ fout=os.path.join(OUTDIR,"wife_v28.png")
  fc.save(fout); print("saved",fout,fc.size)

@@ -42,7 +42,7 @@
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
-#define FW_VERSION 27            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
+#define FW_VERSION 28            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -1611,14 +1611,16 @@ int FindDayPart(int startHour, int endHour) { // artimiausias prognozės įraša
   return -1;
 }
 
-// Dienos dalis: antraštė viršuje (12B: yTop..+28), žemiau ikona ir temperatūra šalia (18B: +36..+78)
+// Dienos dalis (v28): antraštė ir temperatūra KAIRE sulygiuotos (antraštė tiksliai virš temp.
+// pradžios, nebe per ikonos+temp vidurį - taip užlipdavo ant ikonos); ikona kairėje.
 void DrawDayPart(int x, int yTop, String label, int idx) {
   if (idx < 0) return;
+  int tx = x + 8;                                                                // temp. KAIRYS kraštas = antraštės kairė
   setFont(&OpenSans12B);
-  drawStringTop(x, yTop, label, CENTER);                                         // yTop..yTop+24
-  DisplayConditionsSection(x - 40, yTop + 52, WxForecast[idx].Icon, SmallIcon);  // ikonos centras
+  drawStringTop(tx, yTop, label, LEFT);                                          // antraštė virš temp. (yTop..+24)
+  DisplayConditionsSection(x - 44, yTop + 52, WxForecast[idx].Icon, SmallIcon);  // ikona kairėje (centras x-44)
   setFont(&OpenSans24B);                                                         // didesnė temp. (v20+)
-  drawStringTop(x + 40, yTop + 32, String(WxForecast[idx].Temperature, 0) + "°", CENTER); // +32..+82
+  drawStringTop(tx, yTop + 32, String(WxForecast[idx].Temperature, 0) + "°", LEFT); // temp po antrašte (+32..+82)
 }
 
 // Išskaido tekstą į eilutes pagal IŠMATUOTĄ pikselių plotį (ne pagal spėtą simbolių skaičių)
@@ -1689,13 +1691,14 @@ void DrawStaleBar(const String& lastUpd, bool noWifi) {
 // REGIONŲ LENTELĖ (960x540, v20). Aukščiai IŠMATUOTI (get_text_bounds), žingsnis = šrifto advance_y.
 // Šriftų advance_y: 8B=22, 10B=28, 12B=33, 18B=50, 24B=67, 48B=133 (48B "17°" realus h=71).
 //   R1 Temperatūra     y  10..156   orų ikona(x150), „jaučiasi kaip"(18B,C x470), jutiminė(48B,C x470),
-//                                    termometras(12B,C x470); „ŠIANDIEN" skydelis x686..930 y16..142
-//                                    (centr. viršus..L1; 10B antr., maks/min 18B vienoj eil., vėjas+lietus 12B)
+//                                    termometras(12B,C x470); „ŠIANDIEN" blokas KAIRE sulygiuotas x702,
+//                                    vert. skirtukas x680 y12..150 (be rėmelio); 10B antr.@14, maks/min 18B@44
+//                                    vienoj eil., Vėjas 12B@96, Lietus 12B@124
 //   Versija (v26+): žmonos rež. - R4 dešinėje (x940 RIGHT y466); pilname rež. - viršuje dešinėje (x953 y4).
 //   L1 linija          y 158
 //   R2 Aprangos pat.   y 158..340   ŠIANDIEN RENKIS(10B y162), ikonos(x24..312, y186/212), patarimas(24B x2 x360, žingsnis56 @186), pastaba(12B VISADA po patarimo)
 //   L2 linija          y 340
-//   R3 Dienos eiga     y 344..430   antraštė(12B y346), temp(24B y378), ikona(y398); vert. skirtukai x320/640 y342..430
+//   R3 Dienos eiga     y 344..430   antraštė+temp KAIRE sulygiuotos x+8 (12B y346, 24B y378), ikona x-44(y398); vert. skirtukai x320/640 y342..430
 //   L4 linija          y 434
 //   R4 Grįžt. ryšys    y 438..485   išvada RYŠKI(12B x30 y438), korekcija/datos(10B x30 y466) + VERSIJA(10B RIGHT x940 y466)
 //   L3 + R5 baras      y 498..534   (DisplayBottomBar: data be sek., baterija @655 arčiau WiFi)
@@ -1717,18 +1720,21 @@ void DisplayWifeMode() {
     if (WxForecast[r].Temperature < dMin) dMin = WxForecast[r].Temperature;
   }
   float pop = max(WxForecast[0].Pop, max(WxForecast[1].Pop, WxForecast[2].Pop));
-  // "ŠIANDIEN" skydelis: x 686..930, y 24..150 (po v20 žyme)
-  drawRoundRect(686, 16, 244, 126, 12, Grey);                                         // centr. viršus..L1(158): y16..142
+  // "ŠIANDIEN" blokas (v28): be rėmelio - vietoj jo vertikalus skirtukas kairėje; eilutės KAIRE
+  // sulygiuotos (Vėjas ir Lietus prasideda vienodai) ir labiau išretintos (nebe sugrūsta).
+  // Zona x 702..908, y 14..148; skirtukas x680 y12..150.
+  const int LX = 702;                                                                // bendras kairys kraštas visoms eilutėms
+  drawLine(680, 12, 680, 150, Grey);                                                 // vertikalus skirtukas (vietoj rėmelio)
   setFont(&OpenSans10B);
-  drawStringTop(808, 22, "ŠIANDIEN", CENTER);                                         // 22..42
+  drawStringTop(LX, 14, "ŠIANDIEN", LEFT);                                            // 14..34
   setFont(&OpenSans18B);
-  fillTriangle(736, 54, 726, 74, 746, 74, Black);                                     // ▲ dienos maks
-  drawStringTop(752, 44, String(dMax, 0) + "°", LEFT);                                // 44..86
-  fillTriangle(838, 70, 828, 50, 848, 50, Black);                                     // ▼ dienos min
-  drawStringTop(852, 44, String(dMin, 0) + "°", LEFT);
+  fillTriangle(LX + 9, 52, LX, 72, LX + 18, 72, Black);                              // ▲ dienos maks (apex viršuje)
+  drawStringTop(LX + 26, 44, String(dMax, 0) + "°", LEFT);                            // 44..86 (maks ≤ x798)
+  fillTriangle(LX + 120, 72, LX + 110, 52, LX + 130, 52, Black);                      // ▼ dienos min (apex apačioje)
+  drawStringTop(LX + 136, 44, String(dMin, 0) + "°", LEFT);                           // min ≤ x908
   setFont(&OpenSans12B);
-  drawStringTop(808, 84,  "Vėjas " + String(WxConditions[0].Windspeed, 0) + " m/s " + WindDegToOrdinalDirection(WxConditions[0].Winddir), CENTER); // 84..112
-  drawStringTop(808, 112, "Lietus " + String((int)round(pop * 100)) + "%", CENTER);   // 112..140
+  drawStringTop(LX, 96,  "Vėjas " + String(WxConditions[0].Windspeed, 0) + " m/s " + WindDegToOrdinalDirection(WxConditions[0].Winddir), LEFT); // 96..120
+  drawStringTop(LX, 124, "Lietus " + String((int)round(pop * 100)) + "%", LEFT);      // 124..148
   drawLine(20, 158, 940, 158, Black);                                                 // L1
 
   // --- R2: aprangos patarimas (ikonos kairėje, tekstas fiksuotoje zonoje) ---
