@@ -54,11 +54,11 @@ class Screen:
         s.d.line((cx-20,cy+14,cx+20,cy+14),fill=0,width=2)
 
 S=dict(city="Vilnius",date="Pirmadienis, 01-09-2026",time="13:55:07",feels="21",term="22",dmax="22",dmin="12",
-       wind="9 m/s PPR",pop="98",adv="Lengva striukė ir skėtis",
-       note="Diena lietinga - būtinai pasiimk skėtį!",
-       corr="-2.0",ask="09-01",ans="08-31",nxt="rytoj 20:00",
+       wind="9 m/s PPR",pop="98",adv="Vėsoka vasara - plonas švarkelis",
+       note="Vakare atvės iki 9° - pasiimk šiltesnį.",
+       corr="-3.5",ask="07-30",ans="07-30",nxt="rytoj 8:00",
        concl="Dažniau jaučiate šaltį - renku šilčiau",
-       main="icon_paltas",acc=["icon_salikas","icon_sketis"],
+       main="icon_svarkelis",acc=["icon_sketis"],
        parts=[("Rytas","12"),("Diena","22"),("Vakaras","15")])
 
 def bottom(s):
@@ -163,40 +163,103 @@ def v27f():  # TIKRAS dabartinis v27 (remelis; Vejas/Lietus centruoti; dienos da
     s.vline(342,430,320,200); s.vline(342,430,640,200)
     _r4(s,"v27"); bottom(s); return s.img
 
-def v28():  # SIULOMA: be remelio (vert. skirtukas), Vejas/Lietus KAIRE, dienos dalys KAIRE virs temp.
-    s=Screen(); _r1_left(s)
+def _r2c(s):  # R2 su VERTIKALIAI CENTRUOTU tekstu (v28.1) - atitinka main.cpp
+    s.icon(24,186,S["main"],124,124)
+    ax=160
+    for a in S["acc"]: s.icon(ax,212,a,72,72); ax+=80
+    lines=wrap_measured(F[24],S["adv"],580,2); n=len(lines)
+    nl=wrap_measured(F[12],S["note"],580,1); hasNote=len(nl)>0
+    HEAD_INK,HEAD_GAP,ADV_STEP,ADV_INK,NOTE_GAP,NOTE_INK=20,10,56,50,12,24
+    advBlock=(n-1)*ADV_STEP+ADV_INK
+    stackH=HEAD_INK+HEAD_GAP+advBlock+(NOTE_GAP+NOTE_INK if hasNote else 0)
+    top=158+(182-stackH)//2
+    if top<164: top=164
+    s.T(360,top,"ŠIANDIEN RENKIS",10)
+    advTop=top+HEAD_INK+HEAD_GAP
+    for i,ln in enumerate(lines): s.T(360,advTop+i*ADV_STEP,ln,24)
+    if hasNote: s.T(360,advTop+(n-1)*ADV_STEP+ADV_INK+NOTE_GAP,nl[0],12)
+    s.hline(20,940,340)
+
+def _r4c(s,ver):  # R4 su CENTRUOTOMIS eilutemis (v28.1)
+    s.hline(20,940,434,200)
+    s.T(30,442,S["concl"],12)
+    s.T(30,470,"Korekcija "+S["corr"]+"°   ·   atsakyta "+S["ans"]+"   ·   kitas "+S["nxt"],10)
+    s.T(940,470,ver,10,'R')
+
+def _r1_today(s):  # bendra R1 desine ("SIANDIEN" blokas, v28)
     LX=702
-    s.vline(12,150,680,128)                              # vertikalus skirtukas (vietoj remelio)
-    s.T(LX,14,"ŠIANDIEN",10)                             # KAIRE
+    s.vline(12,150,680,128)
+    s.T(LX,14,"ŠIANDIEN",10)
     s.tri(LX+9,52,True);   s.T(LX+26,44,S["dmax"]+"°",18)
     s.tri(LX+120,72,False);s.T(LX+136,44,S["dmin"]+"°",18)
-    s.T(LX,96,"Vėjas "+S["wind"],12); s.T(LX,124,"Lietus "+S["pop"]+"%",12)  # KAIRE - abu prasideda vienodai
+    s.T(LX,96,"Vėjas "+S["wind"],12); s.T(LX,124,"Lietus "+S["pop"]+"%",12)
     s.hline(20,940,158)
-    _r2(s)
-    for (lbl,t),x in zip(S["parts"],(160,480,800)):     # dienos dalys: antraste+temp KAIRE (tx=x+8)
+
+def _r3_parts(s):  # bendra R3 (dienos dalys, v29.1: be vert. skirtuku)
+    for (lbl,t),x in zip(S["parts"],(160,480,800)):
         tx=x+8
-        s.T(tx,346,lbl,12); s.sicon(x-44,398); s.T(tx,378,t+"°",24)
-    s.vline(342,430,320,200); s.vline(342,430,640,200)
-    _r4(s,"v28"); bottom(s); return s.img
+        s.T(tx,346,lbl,12); s.sicon(x-44,398); s.T(tx,384,t+"°",24)   # v30.1: temp nuleista (ikona nekeista, 398)
+
+def _r2j(s):  # MANO SIULYMAS: JUSTIFY - antraste prie virsaus, pastaba prie apacios, patarimas centre
+    s.icon(24,186,S["main"],124,124)
+    ax=160
+    for a in S["acc"]: s.icon(ax,212,a,72,72); ax+=80
+    lines=wrap_measured(F[24],S["adv"],580,2); n=len(lines)
+    nl=wrap_measured(F[12],S["note"],580,1); hasNote=len(nl)>0
+    HEAD_INK,ADV_STEP,ADV_INK,NOTE_INK=20,56,50,24
+    L1,L2,PAD=158,340,8
+    s.T(360,L1+PAD,"ŠIANDIEN RENKIS",10)                 # antraste prisegta prie virsaus
+    headB=L1+PAD+HEAD_INK
+    noteTop=(L2-PAD)-NOTE_INK if hasNote else None
+    advBot=(noteTop-8) if hasNote else (L2-PAD)
+    advH=(n-1)*ADV_STEP+ADV_INK
+    advTop=headB+((advBot-headB)-advH)//2
+    if advTop<headB+6: advTop=headB+6
+    for i,ln in enumerate(lines): s.T(360,advTop+i*ADV_STEP,ln,24)
+    if hasNote: s.T(360,noteTop,nl[0],12)
+    s.hline(20,940,340)
+
+def _r4_mano(s):  # MANO: 2 eil., korekcija PAKELTA i 1-a eil. greta isvados; datos+versija nublankintos apacioje
+    s.hline(20,940,434,200)
+    s.T(30,442,S["concl"]+"   ·   Korekcija "+S["corr"]+"°",12)         # svarbu: isvada + korekcija (12B)
+    s.T(30,470,"atsakyta "+S["ans"]+"   ·   kitas "+S["nxt"],10)        # retai reikalinga (10B)
+    s.T(940,470,"v28",10,'R')
+
+def _r4_jusu(s):  # JUSU (patobulinta): skirtukas x680 (sulygiuotas su SIANDIEN); kaire isvada+korekcija (12B);
+                  # desine atsakyta/kitas DVI mazos eil. (8B); versija - kampe apacioje (kaip anksciau, 10B)
+    s.hline(20,940,434,200)
+    s.T(30,441,S["concl"],12)                                           # kaire eil.1: isvada (12B) - max 545 telpa
+    s.T(30,470,"Korekcija "+S["corr"]+"°",10)                           # kaire eil.2: korekcija (10B, mazesnis)
+    s.vline(438,494,680,128)                                            # skirtukas x680 = SIANDIEN bloko linija
+    s.T(690,444,"Atsakyta "+S["ans"],8)                                 # desine eil.1
+    s.T(690,469,"Kitas "+S["nxt"],8)                                    # desine eil.2
+    s.T(940,476,"v28",10,'R')                                           # versija - apatinis desinys kampas
+
+def build2(r2fn,r4fn):  # ekranas su pasirenkamu R2 ir R4 piesiniu
+    s=Screen(); _r1_left(s); _r1_today(s); r2fn(s); _r3_parts(s); r4fn(s); bottom(s); return s.img
+
+def build(r2fn):  # bendras ekranas su pasirenkamu R2 varianto piesiniu
+    return build2(r2fn,_r4c)
 
 if __name__=="__main__":
- panA=v27f(); panB=v28()
+ OUTDIR=os.path.dirname(os.path.abspath(__file__))
  SC=3
  def up(im): return im.resize((W*SC,H*SC),Image.NEAREST)
- a3,b3=up(panA),up(panB)
- pad,top,gap=30,78,96; cw=W*SC
- canvas=Image.new("L",(cw+2*pad, top+H*SC+gap+top+H*SC+pad),255)
- cd=ImageDraw.Draw(canvas); big=ImageFont.truetype(r"C:\Windows\Fonts\segoeuib.ttf",44)
- cd.text((pad,18),"PRIES (v27)  -  remelis; Vejas/Lietus centruoti; Rytas/Diena/Vakaras per vidury",font=big,fill=0)
- canvas.paste(a3,(pad,top)); cd.rectangle((pad-1,top-1,pad+cw,top+H*SC),outline=0,width=2)
- y2=top+H*SC+gap
- cd.text((pad,y2-58),"PO (v28)  -  vert. skirtukas; Vejas/Lietus is kaires; antrastes virs temp. pradzios",font=big,fill=0)
- canvas.paste(b3,(pad,y2)); cd.rectangle((pad-1,y2-1,pad+cw,y2+H*SC),outline=0,width=2)
- OUTDIR=os.path.dirname(os.path.abspath(__file__))
- out=os.path.join(OUTDIR,"wife_v28_pries_po.png")
- canvas.save(out); print("saved",out,canvas.size)
- fin=panB.resize((W*4,H*4),Image.NEAREST)
- fc=Image.new("L",(W*4+2*20, H*4+2*20),255); ImageDraw.Draw(fc).rectangle((19,19,20+W*4,20+H*4),outline=0,width=2)
- fc.paste(fin,(20,20))
- fout=os.path.join(OUTDIR,"wife_v28.png")
- fc.save(fout); print("saved",fout,fc.size)
+ big=ImageFont.truetype(r"C:\Windows\Fonts\segoeuib.ttf",42)
+ def two(fnameA,labA,imA,labB,imB,out):
+     a3,b3=up(imA),up(imB); pad,top,gap=30,74,92; cw=W*SC
+     canvas=Image.new("L",(cw+2*pad, top+H*SC+gap+top+H*SC+pad),255)
+     cd=ImageDraw.Draw(canvas)
+     cd.text((pad,16),labA,font=big,fill=0)
+     canvas.paste(a3,(pad,top)); cd.rectangle((pad-1,top-1,pad+cw,top+H*SC),outline=0,width=2)
+     y2=top+H*SC+gap
+     cd.text((pad,y2-52),labB,font=big,fill=0)
+     canvas.paste(b3,(pad,y2)); cd.rectangle((pad-1,y2-1,pad+cw,y2+H*SC),outline=0,width=2)
+     p=os.path.join(OUTDIR,out); canvas.save(p); print("saved",p,canvas.size)
+ # NORMALI (#3) vs BLOGIAUSIA (#1 ilgiausia isvada + korekcija -5.0 -> saugiklis 10B)
+ imgN=build2(_r2j,_r4_jusu)
+ S.update(concl="Renkuosi patarimus, reikia daugiau atsiliepimų",corr="-5.0")
+ imgW=build2(_r2j,_r4_jusu)
+ two("safe","NORMALI isvada (#3)  -  isvada 12B eil.1, Korekcija 10B eil.2",imgN,
+          "BLOGIAUSIA isvada (#1, 545px) + Korekcija -5.0  -  vis tiek telpa (isvada viena eil.1)",imgW,
+          "wife_final.png")
