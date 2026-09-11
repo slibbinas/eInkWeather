@@ -53,6 +53,41 @@ class Screen:
         s.d.rectangle((cx-20,cy+2,cx+20,cy+16),fill=255)
         s.d.line((cx-20,cy+14,cx+20,cy+14),fill=0,width=2)
 
+# --- TIKROS SmallIcon ikonos (portuota 1:1 iš main.cpp addcloud/addsun; scale=Small=8) ---
+def _fc(d,cx,cy,r,c):
+    r=int(r)
+    if r<=0: return
+    d.ellipse((int(cx)-r,int(cy)-r,int(cx)+r,int(cy)+r),fill=c)
+def _fr(d,x,y,w,h,c):
+    w=int(w); h=int(h)
+    if w<=0 or h<=0: return
+    d.rectangle((int(x),int(y),int(x)+w-1,int(y)+h-1),fill=c)
+def vaddcloud(d,x,y,s):
+    ls=max(1,s//4)                                   # v32.1 pataisa: kontūras pagal dydį
+    _fc(d,x-s*3,y,s,0); _fc(d,x+s*3,y,s,0)
+    _fc(d,x-s,y-s,s*1.4,0); _fc(d,x+s*1.5,y-s*1.3,s*1.75,0)
+    _fr(d,x-s*3-1,y-s,s*6,s*2+1,0)
+    _fc(d,x-s*3,y,s-ls,255); _fc(d,x+s*3,y,s-ls,255)
+    _fc(d,x-s,y-s,s*1.4-ls,255); _fc(d,x+s*1.5,y-s*1.3,s*1.75-ls,255)
+    _fr(d,x-s*3+2,y-s+ls-1,s*5.9,s*2-ls*2+2,255)
+def vaddsun(d,x,y,s,solid=False):
+    ls=5
+    _fr(d,x-s*2,y,s*4,ls,0); _fr(d,x,y-s*2,ls,s*4,0)
+    d.line((x-s*1.3,y-s*1.3,x+s*1.3,y+s*1.3),fill=0)
+    d.line((x-s*1.3,y+s*1.3,x+s*1.3,y-s*1.3),fill=0)
+    _fc(d,x,y,s*1.3,255); _fc(d,x,y,s,0)
+    if not solid: _fc(d,x,y,s-ls,255)               # žiedas (dabartinis) vs solid (siūlomas)
+def vicon(d,x,y,code,sunS=8,solid=False):
+    S8=8
+    if code[:2] in ("02","04"):                      # MostlySunny/Cloudy su saule
+        vaddsun(d,x-S8*1.8,y-S8*1.8,sunS,solid); vaddcloud(d,x,y,S8)
+    elif code[:2]=="03":                             # Cloudy (tik debesys)
+        vaddcloud(d,x+15,y-22,S8//2); vaddcloud(d,x-10,y-18,S8//2); vaddcloud(d,x,y,S8)
+    elif code[:2]=="01":                             # Sunny
+        vaddsun(d,x,y-3,int(S8*1.6),solid)
+    else:
+        vaddcloud(d,x,y,S8)
+
 S=dict(city="Vilnius",date="Pirmadienis, 01-09-2026",time="13:55:07",feels="21",term="22",dmax="22",dmin="12",
        wind="9 m/s PPR",pop="98",adv="Vėsoka vasara - plonas švarkelis",
        note="Vakare atvės iki 9° - pasiimk šiltesnį.",
@@ -235,8 +270,30 @@ def _r4_jusu(s):  # JUSU (patobulinta): skirtukas x680 (sulygiuotas su SIANDIEN)
     s.T(690,469,"Kitas "+S["nxt"],8)                                    # desine eil.2
     s.T(940,476,"v28",10,'R')                                           # versija - apatinis desinys kampas
 
+def _r1_vallox(s):  # NAUJAS R1: didysis (jausmas is rekupo) pastumtas kairen + trio (Rekup/Jausm/Dabar)
+    s.wreal(150,84)                                        # oru ikona (kaire, desinys krastas ~x235)
+    s.T(385,16,"jaučiasi kaip",12,'C')                     # kaption - pastumta desiniau
+    s.T(385,52,S["big"]+"°",48,'C')                        # DIDYSIS 48B, CENTRAS x385 (nuleista nuo 42->52)
+    LBLX,VALX=518,610                                      # trio: etiketes x518, reiksmes x610 (worst -> ~656 < 680)
+    for i,(lbl,v) in enumerate([("Rekup.",S["recup"]),("Jausm.",S["owmfeels"]),("Dabar",S["owmcur"])]):
+        y=34+i*40                                          # 34/74/114 (12B, telpa iki 156)
+        s.T(LBLX,y,lbl,12); s.T(VALX,y,v+"°",12)
+    _r1_today(s)                                           # "SIANDIEN" blokas desineje + L1
+
 def build2(r2fn,r4fn):  # ekranas su pasirenkamu R2 ir R4 piesiniu
     s=Screen(); _r1_left(s); _r1_today(s); r2fn(s); _r3_parts(s); r4fn(s); bottom(s); return s.img
+
+def build_vallox():  # maketas su NAUJU R1 (Vallox), R2 justify, R3, R4 JUSU
+    s=Screen(); _r1_vallox(s); _r2j(s); _r3_parts(s); _r4_jusu(s); bottom(s); return s.img
+
+def _r3_real(s,sunS,solid):  # dienos eiga su TIKROMIS ikonomis (Rytas 02d, Diena 03d, Vakaras 02d)
+    codes=["02d","03d","02d"]
+    for (lbl,t),x,code in zip(S["parts"],(160,480,800),codes):
+        tx=x+8
+        s.T(tx,346,lbl,12); vicon(s.d,x-44,398,code,sunS,solid); s.T(tx,384,t+"°",24)
+
+def build_vallox_real(sunS,solid):
+    s=Screen(); _r1_vallox(s); _r2j(s); _r3_real(s,sunS,solid); _r4_jusu(s); bottom(s); return s.img
 
 def build(r2fn):  # bendras ekranas su pasirenkamu R2 varianto piesiniu
     return build2(r2fn,_r4c)
@@ -256,10 +313,20 @@ if __name__=="__main__":
      cd.text((pad,y2-52),labB,font=big,fill=0)
      canvas.paste(b3,(pad,y2)); cd.rectangle((pad-1,y2-1,pad+cw,y2+H*SC),outline=0,width=2)
      p=os.path.join(OUTDIR,out); canvas.save(p); print("saved",p,canvas.size)
- # NORMALI (#3) vs BLOGIAUSIA (#1 ilgiausia isvada + korekcija -5.0 -> saugiklis 10B)
- imgN=build2(_r2j,_r4_jusu)
- S.update(concl="Renkuosi patarimus, reikia daugiau atsiliepimų",corr="-5.0")
- imgW=build2(_r2j,_r4_jusu)
- two("safe","NORMALI isvada (#3)  -  isvada 12B eil.1, Korekcija 10B eil.2",imgN,
-          "BLOGIAUSIA isvada (#1, 545px) + Korekcija -5.0  -  vis tiek telpa (isvada viena eil.1)",imgW,
-          "wife_final.png")
+ # MAKETAS: naujas R1 su Vallox rekuperatoriaus temp (didysis kaire + trio Rekup/Jausm/Dabar)
+ S.update(big="4",recup="8",owmfeels="7",owmcur="9",
+          dmax="11",dmin="3",wind="5 m/s V",pop="60",
+          adv="Striukė ir šalikas",note="Vakare lietinga - pasiimk skėtį.",
+          concl="Dažniau jaučiate šaltį - renku šilčiau",corr="-2.0",ans="09-09",nxt="rytoj 8:00",
+          main="icon_striuke",acc=["icon_salikas","icon_sketis"])
+ # DABARTINE saule (žiedas, scale 8) vs SIULOMA (pilna, didesne scale 12) - su TIKROMIS ikonomis
+ two("sun","DABAR (kaip irenginyje): saule ZIEDAS, maza (scale 8) - lieka lanko forma",build_vallox_real(8,False),
+         "SIULOMA: saule PILNA (solid) ir DIDESNE (scale 12)",build_vallox_real(12,True),
+         "wife_sun.png")
+ # Priartinta dienos-eigos juosta (kad saule matytusi is arti)
+ crop_a=build_vallox_real(8,False).crop((60,330,900,440)).resize((840*3,110*3),Image.NEAREST)
+ crop_b=build_vallox_real(12,True).crop((60,330,900,440)).resize((840*3,110*3),Image.NEAREST)
+ zc=Image.new("L",(840*3+40,110*3*2+90),255); zd=ImageDraw.Draw(zc)
+ zd.text((20,6),"DABAR (ziedas, s8)",font=big,fill=0); zc.paste(crop_a,(20,44))
+ zd.text((20,110*3+60),"SIULOMA (solid, s12)",font=big,fill=0); zc.paste(crop_b,(20,110*3+98))
+ zp=os.path.join(OUTDIR,"wife_sun_zoom.png"); zc.save(zp); print("saved",zp,zc.size)

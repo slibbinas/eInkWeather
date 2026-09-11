@@ -42,7 +42,7 @@
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
-#define FW_VERSION 31            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
+#define FW_VERSION 35            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -118,6 +118,11 @@ String OtaKey;       // /ota <raktas> ir paties OTA kanalo slaptažodis (NVS ota
 bool OtaRequested = false; // /ota komanda per Telegram: po sync įjungti OTA režimą be mygtuko
 bool UpdRequested = false; // /atnaujinti komanda: priverstinė naujos versijos patikra šį pabudimą
 String GhPat;              // GitHub fine-grained PAT (tik NVS, į firmware nepatenka!) - atsinaujinimui iš privataus repo
+
+// Vallox rekuperatorius: lokalus IP (NVS valloxIp). Tuščias -> automatinė paieška /24; radus IP
+// ĮSIMENAMAS į NVS ir toliau naudojamas tiesiogiai (neieškom, kol atsiliepia - taupom resursus).
+String ValloxIp;
+float  RecupOutdoor = NAN;  // rekupo lauko temp °C (NAN = nepasiekta / nerasta -> rodom šauktuką)
 
 // Trumpas veikimo žurnalas - grąžinamas per Telegram komandą /log (kaip serial nuotoliniu būdu)
 String RunLog;
@@ -212,6 +217,7 @@ void LoadConfig() { // NVS reikšmės perrašo owm_credentials.h numatytąsias
   FeedbackHr = prefs.getInt("fbHour",      FeedbackHour);
   OtaKey     = prefs.getString("otaKey",   "19750504");
   GhPat      = prefs.getString("ghPat",    "");
+  ValloxIp   = prefs.getString("valloxIp", "");   // tuščias -> ieškom pačioje weather ciklo pabaigoje
   // Boto pakeitimas: tgOffset ir botUser galioja tik konkrečiam botui - su nauju token'u
   // senas offset tyliai "surytų" visas žinutes, o /kvietimas rodytų seno boto nuorodą.
   if (TgToken.length() && prefs.getString("tgTokUsed", "") != TgToken) {
@@ -283,6 +289,7 @@ void StartConfigPortal() { // blokuojanti; po išsaugojimo įrenginys pasileidž
   WiFiManagerParameter p_wife("chatWife", "Žmonos chat ID (nebūtina)", prefs.getString("chatWife", "").c_str(), 24);
   WiFiManagerParameter p_otak("otaKey", "OTA raktas (/ota <raktas>)", OtaKey.c_str(), 16);
   WiFiManagerParameter p_gh("ghPat", "GitHub raktas atsinaujinimui (PAT, nebūtina)", GhPat.c_str(), 100);
+  WiFiManagerParameter p_vlx("valloxIp", "Vallox IP (tuščia = ieškoti pačiam)", ValloxIp.c_str(), 16);
   wm.addParameter(&p_api);
   wm.addParameter(&p_city);
   wm.addParameter(&p_country);
@@ -294,6 +301,7 @@ void StartConfigPortal() { // blokuojanti; po išsaugojimo įrenginys pasileidž
   wm.addParameter(&p_wife);
   wm.addParameter(&p_otak);
   wm.addParameter(&p_gh);
+  wm.addParameter(&p_vlx);
   cfgSaved = false;
   wm.setSaveParamsCallback(OnSaveConfigParams);
   wm.setShowInfoErase(true); // „Info" puslapyje - mygtukas WiFi nustatymams išvalyti
@@ -313,6 +321,7 @@ void StartConfigPortal() { // blokuojanti; po išsaugojimo įrenginys pasileidž
     if (strlen(p_wife.getValue())) prefs.putString("chatWife",  p_wife.getValue());
     if (strlen(p_otak.getValue())) prefs.putString("otaKey",    p_otak.getValue());
     if (strlen(p_gh.getValue()))   prefs.putString("ghPat",     p_gh.getValue());
+    prefs.putString("valloxIp", p_vlx.getValue());  // BE strlen sąlygos: tuščias reiškia „ieškoti pačiam"
   }
   ESP.restart(); // nauji nustatymai įsigalioja po perkrovimo
 }
@@ -473,6 +482,7 @@ void setup() {
         TelegramSync();     // Atsakymai, koeficiento korekcija, perspėjimai - kol WiFi dar veikia
         if (OtaRequested) StartOtaMode(); // /ota per Telegram: WiFi jau gyvas, baigiasi restart'u
         SelfUpdateCheck(UpdRequested);    // kartą per parą / po RESET / per /atnaujinti (radus - restart)
+        UpdateRecup();      // Vallox rekupo lauko temp (WS) - KOL WiFi dar gyvas; jei nepasiekiamas, lieka NAN
         StopWiFi();         // Reduces power consumption
         epd_poweron();      // Switch on EPD display
         epd_clear();        // Clear the screen
@@ -1689,12 +1699,101 @@ void DrawStaleBar(const String& lastUpd, bool noWifi) {
   epd_poweroff_all();
 }
 
+//################ VALLOX REKUPERATORIUS (vietinis WebSocket) ##########################
+// Protokolas iš įrenginio bundle.js (VDigi tools/vallox/read.py): READ_TABLES 246, atsakymas
+// big-endian 1410 B (705 žodžiai); lauko temp = žodis (4356-4289)=67, °C = v/100 - 273.15.
+// Klientas PRIVALO kaukuoti WS kadrus; autentikacijos nėra. Radus IP - įsimenam NVS (neieškom, kol atsiliepia).
+static const int VLX_OUTDOOR_IDX = 4356 - 4289;   // 67
+
+// Vienas skaitymas iš konkretaus IP; true + outC jei gautas tikroviškas atsakymas.
+static bool ValloxTry(IPAddress ip, float &outC, uint32_t connMs) {
+  WiFiClient c;
+  if (!c.connect(ip, 80, connMs)) return false;
+  c.print(F("GET / HTTP/1.1\r\nHost: vlx\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+            "Sec-WebSocket-Key: x3JJHMbDL1EzLkh9GBhXDw==\r\nSec-WebSocket-Version: 13\r\n\r\n"));
+  uint32_t t0 = millis(); String line; bool ok101 = false, hdrEnd = false;
+  while (millis() - t0 < 3000) {
+    if (!c.available()) { if (!c.connected()) break; delay(2); continue; }
+    char ch = c.read();
+    if (ch == '\n') {
+      if (line.indexOf(" 101") >= 0) ok101 = true;
+      if (line.length() == 0) { hdrEnd = true; break; }
+      line = "";
+    } else if (ch != '\r') line += ch;
+  }
+  if (!ok101 || !hdrEnd) { c.stop(); return false; }
+  uint16_t fields[4] = {3, 246, 0, (uint16_t)((3 + 246 + 0) & 0xFFFF)};
+  uint8_t payload[8];
+  for (int i = 0; i < 4; i++) { payload[2*i] = fields[i] & 0xFF; payload[2*i+1] = fields[i] >> 8; }
+  uint8_t mask[4] = {0x12, 0x34, 0x56, 0x78};
+  uint8_t hdr[6] = {0x82, (uint8_t)(0x80 | 8), mask[0], mask[1], mask[2], mask[3]};
+  c.write(hdr, 6);
+  uint8_t masked[8];
+  for (int i = 0; i < 8; i++) masked[i] = payload[i] ^ mask[i % 4];
+  c.write(masked, 8);
+  auto readN = [&](uint8_t *buf, int n) -> bool {
+    int got = 0; uint32_t s = millis();
+    while (got < n && millis() - s < 4000) { if (c.available()) buf[got++] = c.read(); else delay(1); }
+    return got == n;
+  };
+  uint8_t b[2];
+  if (!readN(b, 2)) { c.stop(); return false; }
+  uint32_t len = b[1] & 0x7F;
+  if (len == 126) { uint8_t e[2]; if (!readN(e, 2)) { c.stop(); return false; } len = ((uint32_t)e[0] << 8) | e[1]; }
+  else if (len == 127) { uint8_t e[8]; if (!readN(e, 8)) { c.stop(); return false; } len = ((uint32_t)e[6] << 8) | e[7]; }
+  if (b[1] & 0x80) { uint8_t m[4]; readN(m, 4); }
+  if (len < (uint32_t)(VLX_OUTDOOR_IDX * 2 + 2) || len > 4096) { c.stop(); return false; }
+  static uint8_t buf[1410];
+  uint32_t want = min(len, (uint32_t)sizeof(buf));
+  if (!readN(buf, want)) { c.stop(); return false; }
+  c.stop();
+  uint16_t w = ((uint16_t)buf[VLX_OUTDOOR_IDX * 2] << 8) | buf[VLX_OUTDOOR_IDX * 2 + 1];  // big-endian
+  float t = w / 100.0f - 273.15f;
+  if (t < -60 || t > 60) return false;
+  outC = t;
+  return true;
+}
+
+// Potinklio /24 skenavimas - grąžina rastą IP (String) arba "".
+static String ValloxDiscover(float &outC) {
+  IPAddress me = WiFi.localIP(), mask = WiFi.subnetMask();
+  if (me[0] == 0) return "";
+  IPAddress net(me[0] & mask[0], me[1] & mask[1], me[2] & mask[2], me[3] & mask[3]);
+  LOGT("Vallox: ieskau /24 (" + net.toString() + ")");
+  for (int h = 1; h <= 254; h++) {
+    IPAddress ip(net[0], net[1], net[2], h);
+    if (ip == me) continue;
+    esp_task_wdt_reset();
+    if (ValloxTry(ip, outC, 120)) { LOGT("Vallox rastas: " + ip.toString()); return ip.toString(); }
+  }
+  LOGT("Vallox: nerastas potinklyje");
+  return "";
+}
+
+// Užpildo RecupOutdoor. Naudoja NVS IP; jei tuščias / nebeatsiliepia - skenuoja ir ĮSIMENA.
+void UpdateRecup() {
+  RecupOutdoor = NAN;
+  if (WiFi.status() != WL_CONNECTED) return;
+  float t;
+  if (ValloxIp.length()) {
+    IPAddress ip;
+    if (ip.fromString(ValloxIp) && ValloxTry(ip, t, 2500)) { RecupOutdoor = t; return; }
+    LOGT("Vallox: irasytas IP " + ValloxIp + " neatsiliepe - ieskau is naujo");
+  }
+  String found = ValloxDiscover(t);
+  if (found.length()) {
+    ValloxIp = found;
+    prefs.putString("valloxIp", found);   // įsimenam kitam kartui
+    RecupOutdoor = t;
+  }
+}
+
 // REGIONŲ LENTELĖ (960x540, v20). Aukščiai IŠMATUOTI (get_text_bounds), žingsnis = šrifto advance_y.
 // Šriftų advance_y: 8B=22, 10B=28, 12B=33, 18B=50, 24B=67, 48B=133 (48B "17°" realus h=71).
-//   R1 Temperatūra     y  10..156   orų ikona(x150), „jaučiasi kaip"(18B,C x470), jutiminė(48B,C x470),
-//                                    termometras(12B,C x470); „ŠIANDIEN" blokas KAIRE sulygiuotas x702,
-//                                    vert. skirtukas x680 y12..150 (be rėmelio); 10B antr.@14, maks/min 18B@44
-//                                    vienoj eil., Vėjas 12B@96, Lietus 12B@124
+//   R1 Temperatūra     y  10..156   orų ikona(x150); didysis „jaučiasi kaip" iš Vallox rekupo -
+//                                    kaption 12B C@360 y16 + jutiminė 48B C@360 y42; trio 12B (Rekup/Jausm/Dabar)
+//                                    etiketės x480, reikšmės x574 @34/74/114 (Rekup nerastas -> „?" + šauktukas apskritime);
+//                                    „ŠIANDIEN" blokas x702, vert. skirtukas x680 y12..150; maks/min 18B@44, Vėjas@96, Lietus@124
 //   Versija (v26+): žmonos rež. - R4 dešinėje (x940 RIGHT y466); pilname rež. - viršuje dešinėje (x953 y4).
 //   L1 linija          y 158
 //   R2 Aprangos pat.   y 158..340   ikonos(x24..312, y186/212); tekstas x360 JUSTIFY (v28.2): ŠIANDIEN RENKIS 10B prie viršaus(166), patarimas 24B centre, pastaba 12B prie apačios(308)
@@ -1704,14 +1803,26 @@ void DrawStaleBar(const String& lastUpd, bool noWifi) {
 //   R4 Grįžt. ryšys    y 434..498   kaire: išvada(12B x30 y441)+Korekcija(10B x30 y470); skirtukas x680; dešine: Atsakyta/Kitas(8B x690 y444/469); VERSIJA(10B RIGHT x940 y476) (v28.2)
 //   L3 + R5 baras      y 498..534   (DisplayBottomBar: data be sek., baterija @655 arčiau WiFi)
 void DisplayWifeMode() {
-  // --- R1: temperatūros blokas (ikona + jutiminė centre; dešinėje "ŠIANDIEN" skydelis) ---
+  // --- R1: didysis "jaučiasi kaip" (iš Vallox rekupo lauko temp) kairiau + trio (Rekup/Jausm/Dabar);
+  //         dešinėje "ŠIANDIEN" blokas. Didysis centruotas tarp ikonos ir trio (x360). ---
   DisplayConditionsSection(150, 84, WxConditions[0].Icon, LargeIcon);                 // orų ikona kairėje
-  setFont(&OpenSans18B);
-  drawStringTop(470, 10, "jaučiasi kaip", CENTER);                                    // 10..48
-  setFont(&OpenSans48B);
-  drawStringTop(470, 52, String(WxConditions[0].Feelslike, 0) + "°", CENTER);         // 52..123
+  float owmFeels = WxConditions[0].Feelslike, owmCur = WxConditions[0].Temperature;
+  // didysis = rekup + OWM "feels" poslinkis (vėjas/drėgmė) + ChillBias; nėra rekupo -> owm feels + ChillBias
+  float bigT = (!isnan(RecupOutdoor) ? RecupOutdoor + (owmFeels - owmCur) : owmFeels) + ChillBias;
   setFont(&OpenSans12B);
-  drawStringTop(470, 128, "termometras rodo " + String(WxConditions[0].Temperature, 0) + "°", CENTER); // 128..156
+  drawStringTop(385, 16, "jaučiasi kaip", CENTER);                                    // 16..40 (pastumta dešiniau, link temp.)
+  setFont(&OpenSans48B);
+  drawStringTop(385, 52, String(bigT, 0) + "°", CENTER);                              // 52..123 (nuleista - buvo prilipę prie kaption)
+  setFont(&OpenSans12B);                                                             // trio: Rekup/Jausm/Dabar
+  const int TLBL = 518, TVAL = 610;
+  drawStringTop(TLBL, 34, "Rekup.", LEFT);
+  if (isnan(RecupOutdoor)) {                                                          // nerastas -> "?" + šauktukas apskritime
+    drawStringTop(TVAL, 34, "?", LEFT);
+    drawCircle(TVAL + 44, 45, 10, Black);
+    fillRect(TVAL + 43, 39, 3, 8, Black); fillRect(TVAL + 43, 49, 3, 3, Black);
+  } else drawStringTop(TVAL, 34, String(RecupOutdoor, 0) + "°", LEFT);
+  drawStringTop(TLBL, 74,  "Jausm.", LEFT); drawStringTop(TVAL, 74,  String(owmFeels, 0) + "°", LEFT);
+  drawStringTop(TLBL, 114, "Dabar",  LEFT); drawStringTop(TVAL, 114, String(owmCur,  0) + "°", LEFT);
   // DIENOS temperatūros ribos (ne tik dabartinė)
   float dMax = WxConditions[0].Temperature, dMin = WxConditions[0].Temperature;
   for (int r = 0; r < 8; r++) {
@@ -2198,6 +2309,10 @@ void DrawBattery(int x, int y) {
 
 // Symbols are drawn on a relative 10x10grid and 1 scale unit = 1 drawing unit
 void addcloud(int x, int y, int scale, int linesize) {
+  // v32.1: kontūro storis PROPORCINGAS dydžiui. Anksčiau linesize=5 buvo fiksuotas -> maži debesėliai
+  // (Cloudy scale/2=4) turėjo linesize >= spindulio, „iškirpimas" nieko nedarydavo ir jie likdavo
+  // juodos dėmės ("makaronai" viršuje). Large nesikeičia: 20/4 = 5 kaip anksčiau.
+  linesize = max(1, scale / 4);
   fillCircle(x - scale * 3, y, scale, Black);                                                              // Left most circle
   fillCircle(x + scale * 3, y, scale, Black);                                                              // Right most circle
   fillCircle(x - scale, y - scale, scale * 1.4, Black);                                                    // left middle upper circle
@@ -2271,7 +2386,7 @@ void addsun(int x, int y, int scale, bool IconSize) {
   }
   fillCircle(x, y, scale * 1.3, White);
   fillCircle(x, y, scale, Black);
-  fillCircle(x, y, scale - linesize, White);
+  if (IconSize != SmallIcon) fillCircle(x, y, scale - linesize, White); // v33.1: maža saulė PILNA (be žiedo skylės)
 }
 
 void addfog(int x, int y, int scale, int linesize, bool IconSize) {
@@ -2305,7 +2420,8 @@ void MostlySunny(int x, int y, bool IconSize, String IconName) {
     Offset = 35;
   }
   if (IconName.endsWith("n")) addmoon(x, y + Offset, scale, IconSize);
-  addsun(x - scale * 1.8, y - scale * 1.8, scale, IconSize);
+  int sunScale = (IconSize == SmallIcon) ? (int)(scale * 1.5) : scale;  // v33.1: maža saulė didesnė
+  addsun(x - scale * 1.8, y - scale * 1.8, sunScale, IconSize);
   addcloud(x, y, scale, linesize);
 }
 
@@ -2317,7 +2433,8 @@ void MostlyCloudy(int x, int y, bool IconSize, String IconName) {
   }
   if (IconName.endsWith("n")) addmoon(x, y + Offset, scale, IconSize);
   addcloud(x, y, scale, linesize);
-  addsun(x - scale * 1.8, y - scale * 1.8, scale, IconSize);
+  int sunScale = (IconSize == SmallIcon) ? (int)(scale * 1.5) : scale;  // v33.1: maža saulė didesnė
+  addsun(x - scale * 1.8, y - scale * 1.8, sunScale, IconSize);
 }
 
 void Cloudy(int x, int y, bool IconSize, String IconName) {

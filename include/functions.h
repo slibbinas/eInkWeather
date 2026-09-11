@@ -14,6 +14,7 @@ void InitialiseSystem();
 bool obtainWeatherData(WiFiClient & client, const String & RequestType);
 bool DecodeWeather(WiFiClient& json, String Type);
 boolean UpdateLocalTime();
+void UpdateRecup();   // Vallox rekuperatoriaus lauko temp skaitymas (WS /24 paieška + NVS kešas)
 
 // --- EKRANO VALDYMO IR PIEŠIMO (pagalbinės) ---
 void edp_update();
