@@ -42,7 +42,7 @@
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
-#define FW_VERSION 35            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
+#define FW_VERSION 37            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -1791,8 +1791,8 @@ void UpdateRecup() {
 // REGIONŲ LENTELĖ (960x540, v20). Aukščiai IŠMATUOTI (get_text_bounds), žingsnis = šrifto advance_y.
 // Šriftų advance_y: 8B=22, 10B=28, 12B=33, 18B=50, 24B=67, 48B=133 (48B "17°" realus h=71).
 //   R1 Temperatūra     y  10..156   orų ikona(x150); didysis „jaučiasi kaip" iš Vallox rekupo -
-//                                    kaption 12B C@360 y16 + jutiminė 48B C@360 y42; trio 12B (Rekup/Jausm/Dabar)
-//                                    etiketės x480, reikšmės x574 @34/74/114 (Rekup nerastas -> „?" + šauktukas apskritime);
+//                                    kaption 12B C@405 y16 + jutiminė 48B C@405 y52; trio etiketės 12B (x518) +
+//                                    REIKŠMĖS 18B (x604) @yv 20/66/112 (Rekup nerastas -> „?" + šauktukas apskritime);
 //                                    „ŠIANDIEN" blokas x702, vert. skirtukas x680 y12..150; maks/min 18B@44, Vėjas@96, Lietus@124
 //   Versija (v26+): žmonos rež. - R4 dešinėje (x940 RIGHT y466); pilname rež. - viršuje dešinėje (x953 y4).
 //   L1 linija          y 158
@@ -1810,19 +1810,22 @@ void DisplayWifeMode() {
   // didysis = rekup + OWM "feels" poslinkis (vėjas/drėgmė) + ChillBias; nėra rekupo -> owm feels + ChillBias
   float bigT = (!isnan(RecupOutdoor) ? RecupOutdoor + (owmFeels - owmCur) : owmFeels) + ChillBias;
   setFont(&OpenSans12B);
-  drawStringTop(385, 16, "jaučiasi kaip", CENTER);                                    // 16..40 (pastumta dešiniau, link temp.)
+  drawStringTop(405, 16, "jaučiasi kaip", CENTER);                                    // 16..40 (v35.1: didysis truputį dešiniau)
   setFont(&OpenSans48B);
-  drawStringTop(385, 52, String(bigT, 0) + "°", CENTER);                              // 52..123 (nuleista - buvo prilipę prie kaption)
-  setFont(&OpenSans12B);                                                             // trio: Rekup/Jausm/Dabar
-  const int TLBL = 518, TVAL = 610;
-  drawStringTop(TLBL, 34, "Rekup.", LEFT);
+  drawStringTop(405, 52, String(bigT, 0) + "°", CENTER);                              // 52..123 (worst -25 -> 313..497 < TLBL 518)
+  // trio (v35.1): etiketės 12B (x518), REIKŠMĖS 18B (x604) - didesni skaičiai, praretinti (yv 20/66/112)
+  const int TLBL = 518, TVAL = 604;
+  auto trioRow = [&](int yv, const char* lbl, const String &val) {
+    setFont(&OpenSans12B); drawStringTop(TLBL, yv + 8, lbl, LEFT);                    // etiketė sulygiuota su reikšmės centru
+    setFont(&OpenSans18B); drawStringTop(TVAL, yv, val, LEFT);                        // reikšmė 18B (worst -25 -> x674 < 680)
+  };
   if (isnan(RecupOutdoor)) {                                                          // nerastas -> "?" + šauktukas apskritime
-    drawStringTop(TVAL, 34, "?", LEFT);
-    drawCircle(TVAL + 44, 45, 10, Black);
-    fillRect(TVAL + 43, 39, 3, 8, Black); fillRect(TVAL + 43, 49, 3, 3, Black);
-  } else drawStringTop(TVAL, 34, String(RecupOutdoor, 0) + "°", LEFT);
-  drawStringTop(TLBL, 74,  "Jausm.", LEFT); drawStringTop(TVAL, 74,  String(owmFeels, 0) + "°", LEFT);
-  drawStringTop(TLBL, 114, "Dabar",  LEFT); drawStringTop(TVAL, 114, String(owmCur,  0) + "°", LEFT);
+    trioRow(20, "Rekup.", "?");
+    drawCircle(TVAL + 40, 32, 10, Black);
+    fillRect(TVAL + 39, 26, 3, 8, Black); fillRect(TVAL + 39, 36, 3, 3, Black);
+  } else trioRow(20, "Rekup.", String(RecupOutdoor, 0) + "°");
+  trioRow(66,  "Jausm.", String(owmFeels, 0) + "°");
+  trioRow(112, "Dabar",  String(owmCur,  0) + "°");
   // DIENOS temperatūros ribos (ne tik dabartinė)
   float dMax = WxConditions[0].Temperature, dMin = WxConditions[0].Temperature;
   for (int r = 0; r < 8; r++) {
@@ -1840,10 +1843,10 @@ void DisplayWifeMode() {
   setFont(&OpenSans10B);
   drawStringTop(LX, 14, "ŠIANDIEN", LEFT);                                            // 14..34
   setFont(&OpenSans18B);
-  fillTriangle(LX + 9, 52, LX, 72, LX + 18, 72, Black);                              // ▲ dienos maks (apex viršuje)
-  drawStringTop(LX + 26, 44, String(dMax, 0) + "°", LEFT);                            // 44..86 (maks ≤ x798)
-  fillTriangle(LX + 120, 72, LX + 110, 52, LX + 130, 52, Black);                      // ▼ dienos min (apex apačioje)
-  drawStringTop(LX + 136, 44, String(dMin, 0) + "°", LEFT);                           // min ≤ x908
+  fillTriangle(LX + 9, 60, LX, 80, LX + 18, 80, Black);                              // ▲ dienos maks (v36.1: nuleista, arčiau Vėjo)
+  drawStringTop(LX + 26, 52, String(dMax, 0) + "°", LEFT);                            // 52..~86 (maks ≤ x798)
+  fillTriangle(LX + 120, 80, LX + 110, 60, LX + 130, 60, Black);                      // ▼ dienos min (apex apačioje)
+  drawStringTop(LX + 136, 52, String(dMin, 0) + "°", LEFT);                           // min ≤ x908
   setFont(&OpenSans12B);
   drawStringTop(LX, 96,  "Vėjas " + String(WxConditions[0].Windspeed, 0) + " m/s " + WindDegToOrdinalDirection(WxConditions[0].Winddir), LEFT); // 96..120
   drawStringTop(LX, 124, "Lietus " + String((int)round(pop * 100)) + "%", LEFT);      // 124..148
@@ -2386,7 +2389,7 @@ void addsun(int x, int y, int scale, bool IconSize) {
   }
   fillCircle(x, y, scale * 1.3, White);
   fillCircle(x, y, scale, Black);
-  if (IconSize != SmallIcon) fillCircle(x, y, scale - linesize, White); // v33.1: maža saulė PILNA (be žiedo skylės)
+  fillCircle(x, y, scale - linesize, White); // v35.1: saulė TUŠČIAVIDURĖ (žiedas) - kaip didžioji orų ikona (variantas B)
 }
 
 void addfog(int x, int y, int scale, int linesize, bool IconSize) {
@@ -2552,15 +2555,11 @@ void Visibility(int x, int y, String Visi) {
 }
 
 void addmoon(int x, int y, int scale, bool IconSize) {
-  if (IconSize == LargeIcon) {
-    fillCircle(x - 85, y - 100, uint16_t(scale * 0.8), Black);
-    fillCircle(x - 57, y - 100, uint16_t(scale * 1.6), White);
-  }
-  else
-  {
-    fillCircle(x - 28, y - 37, uint16_t(scale * 1.0), Black);
-    fillCircle(x - 20, y - 37, uint16_t(scale * 1.6), White);
-  }
+  // v36.1: MAŽOMS ikonoms (dienos eiga / 3h prognozė) mėnulio NEPIEŠIAM - naktinis pusmėnulis ten
+  // atrodo kaip artefaktas „(" (juodas apskritimas iškąstas baltu). Didžioji orų ikona mėnulį pasilieka.
+  if (IconSize != LargeIcon) return;
+  fillCircle(x - 85, y - 100, uint16_t(scale * 0.8), Black);
+  fillCircle(x - 57, y - 100, uint16_t(scale * 1.6), White);
 }
 
 void Nodata(int x, int y, bool IconSize, String IconName) {

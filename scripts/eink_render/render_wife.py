@@ -77,8 +77,11 @@ def vaddsun(d,x,y,s,solid=False):
     d.line((x-s*1.3,y+s*1.3,x+s*1.3,y-s*1.3),fill=0)
     _fc(d,x,y,s*1.3,255); _fc(d,x,y,s,0)
     if not solid: _fc(d,x,y,s-ls,255)               # žiedas (dabartinis) vs solid (siūlomas)
-def vicon(d,x,y,code,sunS=8,solid=False):
+def vaddmoon(d,x,y,s):                                # SmallIcon pusmenulis (kaip main.cpp addmoon)
+    _fc(d,x-28,y-37,s,0); _fc(d,x-20,y-37,s*1.6,255)
+def vicon(d,x,y,code,sunS=8,solid=False,skipMoon=True):           # v36.1: menulio mazoms ikonoms NEPIESIAM
     S8=8
+    if code.endswith("n") and not skipMoon: vaddmoon(d,x,y+10,S8)   # (naktinis menulis = "(" artefaktas)
     if code[:2] in ("02","04"):                      # MostlySunny/Cloudy su saule
         vaddsun(d,x-S8*1.8,y-S8*1.8,sunS,solid); vaddcloud(d,x,y,S8)
     elif code[:2]=="03":                             # Cloudy (tik debesys)
@@ -87,6 +90,11 @@ def vicon(d,x,y,code,sunS=8,solid=False):
         vaddsun(d,x,y-3,int(S8*1.6),solid)
     else:
         vaddcloud(d,x,y,S8)
+
+def sun_variant(d,cx,cy,sunS,solid,offx,offy):       # partly-cloudy: saule (parametrizuota) UZ debesies
+    S8=8
+    vaddsun(d,cx-S8*offx,cy-S8*offy,sunS,solid)
+    vaddcloud(d,cx,cy,S8)
 
 S=dict(city="Vilnius",date="Pirmadienis, 01-09-2026",time="13:55:07",feels="21",term="22",dmax="22",dmin="12",
        wind="9 m/s PPR",pop="98",adv="Vėsoka vasara - plonas švarkelis",
@@ -225,8 +233,8 @@ def _r1_today(s):  # bendra R1 desine ("SIANDIEN" blokas, v28)
     LX=702
     s.vline(12,150,680,128)
     s.T(LX,14,"ŠIANDIEN",10)
-    s.tri(LX+9,52,True);   s.T(LX+26,44,S["dmax"]+"°",18)
-    s.tri(LX+120,72,False);s.T(LX+136,44,S["dmin"]+"°",18)
+    s.tri(LX+9,60,True);   s.T(LX+26,52,S["dmax"]+"°",18)   # v36.1: nuleista nuo antrastes, arciau Vejo
+    s.tri(LX+120,80,False);s.T(LX+136,52,S["dmin"]+"°",18)
     s.T(LX,96,"Vėjas "+S["wind"],12); s.T(LX,124,"Lietus "+S["pop"]+"%",12)
     s.hline(20,940,158)
 
@@ -280,11 +288,27 @@ def _r1_vallox(s):  # NAUJAS R1: didysis (jausmas is rekupo) pastumtas kairen + 
         s.T(LBLX,y,lbl,12); s.T(VALX,y,v+"°",12)
     _r1_today(s)                                           # "SIANDIEN" blokas desineje + L1
 
+def _r1_vallox_p(s):  # SIULOMA (task3): didysis desiniau (405) + trio REIKSMES 18B, praretintos i apacia
+    s.wreal(150,84)
+    s.T(405,16,"jaučiasi kaip",12,'C')
+    s.T(405,52,S["big"]+"°",48,'C')
+    LBLX,VALX=518,604
+    rows=[("Rekup.",S["recup"]),("Jausm.",S["owmfeels"]),("Dabar",S["owmcur"])]
+    for i,(lbl,v) in enumerate(rows):
+        yv=20+i*46                       # value 18B tops 20/66/112 (praretinta, telpa iki 156)
+        s.T(LBLX,yv+8,lbl,12)            # etikete 12B, sulygiuota su value centru
+        s.T(VALX,yv,v+"°",18)            # REIKSME 18B (worst -25 -> x674 < 680)
+    _r1_today(s)
+
 def build2(r2fn,r4fn):  # ekranas su pasirenkamu R2 ir R4 piesiniu
     s=Screen(); _r1_left(s); _r1_today(s); r2fn(s); _r3_parts(s); r4fn(s); bottom(s); return s.img
 
 def build_vallox():  # maketas su NAUJU R1 (Vallox), R2 justify, R3, R4 JUSU
     s=Screen(); _r1_vallox(s); _r2j(s); _r3_parts(s); _r4_jusu(s); bottom(s); return s.img
+def build_v_cur():   # DABAR: R1 su 12B trio, saule B (tuscioaviduris s12) dienos eigoje
+    s=Screen(); _r1_vallox(s);   _r2j(s); _r3_real(s,12,False); _r4_jusu(s); bottom(s); return s.img
+def build_v_prop():  # SIULOMA: R1 didysis desiniau + trio 18B; saule B
+    s=Screen(); _r1_vallox_p(s); _r2j(s); _r3_real(s,12,False); _r4_jusu(s); bottom(s); return s.img
 
 def _r3_real(s,sunS,solid):  # dienos eiga su TIKROMIS ikonomis (Rytas 02d, Diena 03d, Vakaras 02d)
     codes=["02d","03d","02d"]
@@ -319,14 +343,28 @@ if __name__=="__main__":
           adv="Striukė ir šalikas",note="Vakare lietinga - pasiimk skėtį.",
           concl="Dažniau jaučiate šaltį - renku šilčiau",corr="-2.0",ans="09-09",nxt="rytoj 8:00",
           main="icon_striuke",acc=["icon_salikas","icon_sketis"])
- # DABARTINE saule (žiedas, scale 8) vs SIULOMA (pilna, didesne scale 12) - su TIKROMIS ikonomis
- two("sun","DABAR (kaip irenginyje): saule ZIEDAS, maza (scale 8) - lieka lanko forma",build_vallox_real(8,False),
-         "SIULOMA: saule PILNA (solid) ir DIDESNE (scale 12)",build_vallox_real(12,True),
-         "wife_sun.png")
- # Priartinta dienos-eigos juosta (kad saule matytusi is arti)
- crop_a=build_vallox_real(8,False).crop((60,330,900,440)).resize((840*3,110*3),Image.NEAREST)
- crop_b=build_vallox_real(12,True).crop((60,330,900,440)).resize((840*3,110*3),Image.NEAREST)
- zc=Image.new("L",(840*3+40,110*3*2+90),255); zd=ImageDraw.Draw(zc)
- zd.text((20,6),"DABAR (ziedas, s8)",font=big,fill=0); zc.paste(crop_a,(20,44))
- zd.text((20,110*3+60),"SIULOMA (solid, s12)",font=big,fill=0); zc.paste(crop_b,(20,110*3+98))
- zp=os.path.join(OUTDIR,"wife_sun_zoom.png"); zc.save(zp); print("saved",zp,zc.size)
+ # TASK3: DABAR (trio 12B) vs SIULOMA (didysis @405, trio reiksmes 18B praretintos). Saule = B (abiejuose).
+ two("t3","DABAR: didysis @385, trio 12B",build_v_cur(),
+         "SIULOMA: didysis desiniau @405, trio reiksmes 18B (praretintos), saule B tuscioavidure",build_v_prop(),
+         "wife_task3.png")
+ # Priartinta R1 juosta (kad matytusi didysis + trio + saules ikona)
+ ca=build_v_cur().crop((120,10,700,160)).resize((580*3,150*3),Image.NEAREST)
+ cb=build_v_prop().crop((120,10,700,160)).resize((580*3,150*3),Image.NEAREST)
+ zc=Image.new("L",(580*3+40,150*3*2+110),255); zd=ImageDraw.Draw(zc)
+ zd.text((20,6),"DABAR (trio 12B, didysis @385)",font=big,fill=0); zc.paste(ca,(20,50))
+ zd.text((20,150*3+80),"SIULOMA (trio 18B, didysis @405)",font=big,fill=0); zc.paste(cb,(20,150*3+124))
+ zp=os.path.join(OUTDIR,"wife_task3_zoom.png"); zc.save(zp); print("saved",zp,zc.size)
+ # INSPEKCIJA: ryto (Rytas) dienos-dalies ikona (02d) LABAI priartinta - ieskom "(" artefakto
+ full=build_v_prop()
+ iz=full.crop((70,344,300,432)).resize((230*8,88*8),Image.NEAREST)  # apie Rytas ikona (centras x116 y398)
+ izc=Image.new("L",(iz.width,iz.height+50),255); ImageDraw.Draw(izc).text((10,10),"RYTAS ikona 02d (v36 hollow saule) - 8x",font=big,fill=0)
+ izc.paste(iz,(0,50))
+ ip=os.path.join(OUTDIR,"wife_rytas_zoom.png"); izc.save(ip); print("saved",ip,izc.size)
+ # MOON artefaktas: 02n SU menuliu (dabar) vs BE menulio (siulomas fix) - 8x
+ def moon_cell(skip):
+     im=Image.new("L",(230,110),255); vicon(ImageDraw.Draw(im),116-70+30,55,"02n",12,False,skip); return im
+ ma=moon_cell(False).resize((230*6,110*6),Image.NEAREST); mb=moon_cell(True).resize((230*6,110*6),Image.NEAREST)
+ mc=Image.new("L",(230*6*2+60,110*6+70),255); md=ImageDraw.Draw(mc)
+ md.text((10,10),"02n SU menuliu (DABAR - matosi '(' )",font=big,fill=0); mc.paste(ma,(10,60))
+ md.text((230*6+40,10),"02n BE menulio (FIX)",font=big,fill=0); mc.paste(mb,(230*6+40,60))
+ mp=os.path.join(OUTDIR,"wife_moon.png"); mc.save(mp); print("saved",mp,mc.size)
