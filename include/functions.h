@@ -65,7 +65,6 @@ void DrawPressureAndTrend(int x, int y, float pressure, String slope);
 void DrawMoon(int x, int y, int day, int month, int year, String hemisphere);
 
 // --- IKONŲ PIEŠIMAS ---
-void addmoon(int x, int y, int scale, bool IconSize);
 void addsun(int x, int y, int scale, bool IconSize);
 void addcloud(int x, int y, int scale, int linesize);
 void addrain(int x, int y, int scale, bool IconSize);

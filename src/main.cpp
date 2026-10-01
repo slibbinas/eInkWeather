@@ -42,7 +42,7 @@
 
 //################  VERSION  ##################################################
 String version = "2.5 / 4.7in";  // Programme version, see change log at end
-#define FW_VERSION 37            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
+#define FW_VERSION 38            // Savarankiško atsinaujinimo numeris - didinti kartu su firmware/version.txt!
 //################ VARIABLES ##################################################
 
 // enum alignment {LEFT, RIGHT, CENTER};
@@ -2405,128 +2405,84 @@ void addfog(int x, int y, int scale, int linesize, bool IconSize) {
 }
 
 void Sunny(int x, int y, bool IconSize, String IconName) {
-  int scale = Small, Offset = 10;
-  if (IconSize == LargeIcon) {
-    scale = Large;
-    Offset = 35;
-  }
+  int scale = Small;
+  if (IconSize == LargeIcon) scale = Large;
   else y = y - 3; // Shift up small sun icon
-  if (IconName.endsWith("n")) addmoon(x, y + Offset, scale, IconSize);
   scale = scale * 1.6;
   addsun(x, y, scale, IconSize);
 }
 
 void MostlySunny(int x, int y, bool IconSize, String IconName) {
-  int scale = Small, linesize = 5, Offset = 10;
-  if (IconSize == LargeIcon) {
-    scale = Large;
-    Offset = 35;
-  }
-  if (IconName.endsWith("n")) addmoon(x, y + Offset, scale, IconSize);
-  int sunScale = (IconSize == SmallIcon) ? (int)(scale * 1.5) : scale;  // v33.1: maža saulė didesnė
+  int scale = Small, linesize = 5;
+  if (IconSize == LargeIcon) scale = Large;
+  int sunScale = (IconSize == SmallIcon) ? (int)(scale * 1.5) : scale;  // v33.1: maza saule didesne
   addsun(x - scale * 1.8, y - scale * 1.8, sunScale, IconSize);
   addcloud(x, y, scale, linesize);
 }
 
 void MostlyCloudy(int x, int y, bool IconSize, String IconName) {
-  int scale = Small, linesize = 5, Offset = 10;
-  if (IconSize == LargeIcon) {
-    scale = Large;
-    Offset = 35;
-  }
-  if (IconName.endsWith("n")) addmoon(x, y + Offset, scale, IconSize);
+  int scale = Small, linesize = 5;
+  if (IconSize == LargeIcon) scale = Large;
   addcloud(x, y, scale, linesize);
-  int sunScale = (IconSize == SmallIcon) ? (int)(scale * 1.5) : scale;  // v33.1: maža saulė didesnė
+  int sunScale = (IconSize == SmallIcon) ? (int)(scale * 1.5) : scale;  // v33.1: maza saule didesne
   addsun(x - scale * 1.8, y - scale * 1.8, sunScale, IconSize);
 }
 
 void Cloudy(int x, int y, bool IconSize, String IconName) {
-  int scale = Small, linesize = 5, Offset = 10;
-  if (IconSize == LargeIcon) {
-    scale = Large;
-    Offset = 35;
-  }
-  if (IconName.endsWith("n")) addmoon(x, y + Offset, scale, IconSize);
+  int scale = Small, linesize = 5;
+  if (IconSize == LargeIcon) scale = Large;
   addcloud(x + 15, y - 22, scale / 2, linesize); // Cloud top right
   addcloud(x - 10, y - 18, scale / 2, linesize); // Cloud top left
   addcloud(x, y, scale, linesize);             // Main cloud
 }
 
 void Rain(int x, int y, bool IconSize, String IconName) {
-  int scale = Small, linesize = 5, Offset = 10;
-  if (IconSize == LargeIcon) {
-    scale = Large;
-    Offset = 35;
-  }
-  if (IconName.endsWith("n")) addmoon(x, y + Offset, scale, IconSize);
+  int scale = Small, linesize = 5;
+  if (IconSize == LargeIcon) scale = Large;
   addcloud(x, y, scale, linesize);
   addrain(x, y, scale, IconSize);
 }
 
 void ExpectRain(int x, int y, bool IconSize, String IconName) {
-  int scale = Small, linesize = 5, Offset = 10;
-  if (IconSize == LargeIcon) {
-    scale = Large;
-    Offset = 35;
-  }
-  if (IconName.endsWith("n")) addmoon(x, y + Offset, scale, IconSize);
+  int scale = Small, linesize = 5;
+  if (IconSize == LargeIcon) scale = Large;
   addsun(x - scale * 1.8, y - scale * 1.8, scale, IconSize);
   addcloud(x, y, scale, linesize);
   addrain(x, y, scale, IconSize);
 }
 
 void ChanceRain(int x, int y, bool IconSize, String IconName) {
-  int scale = Small, linesize = 5, Offset = 10;;
-  if (IconSize == LargeIcon) {
-    scale = Large;
-    Offset = 35;
-  }
-  if (IconName.endsWith("n")) addmoon(x, y + Offset, scale, IconSize);
+  int scale = Small, linesize = 5;
+  if (IconSize == LargeIcon) scale = Large;
   addsun(x - scale * 1.8, y - scale * 1.8, scale, IconSize);
   addcloud(x, y, scale, linesize);
   addrain(x, y, scale, IconSize);
 }
 
 void Tstorms(int x, int y, bool IconSize, String IconName) {
-  int scale = Small, linesize = 5, Offset = 10;
-  if (IconSize == LargeIcon) {
-    scale = Large;
-    Offset = 35;
-  }
-  if (IconName.endsWith("n")) addmoon(x, y + Offset, scale, IconSize);
+  int scale = Small, linesize = 5;
+  if (IconSize == LargeIcon) scale = Large;
   addcloud(x, y, scale, linesize);
   addtstorm(x, y, scale);
 }
 
 void Snow(int x, int y, bool IconSize, String IconName) {
-  int scale = Small, linesize = 5, Offset = 10;
-  if (IconSize == LargeIcon) {
-    scale = Large;
-    Offset = 35;
-  }
-  if (IconName.endsWith("n")) addmoon(x, y + Offset, scale, IconSize);
+  int scale = Small, linesize = 5;
+  if (IconSize == LargeIcon) scale = Large;
   addcloud(x, y, scale, linesize);
   addsnow(x, y, scale, IconSize);
 }
 
 void Fog(int x, int y, bool IconSize, String IconName) {
-  int scale = Small, linesize = 5, Offset = 10;
-  if (IconSize == LargeIcon) {
-    scale = Large;
-    Offset = 35;
-  }
-  if (IconName.endsWith("n")) addmoon(x, y + Offset, scale, IconSize);
+  int scale = Small, linesize = 5;
+  if (IconSize == LargeIcon) scale = Large;
   addcloud(x, y - 5, scale, linesize);
   addfog(x, y - 5, scale, linesize, IconSize);
 }
 
 void Haze(int x, int y, bool IconSize, String IconName) {
-  int scale = Small, linesize = 5, Offset = 10;
-  if (IconSize == LargeIcon) {
-    scale = Large;
-    Offset = 35;
-  }
-  if (IconName.endsWith("n")) addmoon(x, y + Offset, scale, IconSize);
+  int scale = Small, linesize = 5;
+  if (IconSize == LargeIcon) scale = Large;
   addsun(x, y - 5, scale * 1.4, IconSize);
   addfog(x, y - 5, scale * 1.4, linesize, IconSize);
 }
@@ -2552,14 +2508,6 @@ void Visibility(int x, int y, String Visi) {
   }
   fillCircle(x, y + Offset, r / 4, Black);
   drawString(x + 20, y, Visi, LEFT);
-}
-
-void addmoon(int x, int y, int scale, bool IconSize) {
-  // v36.1: MAŽOMS ikonoms (dienos eiga / 3h prognozė) mėnulio NEPIEŠIAM - naktinis pusmėnulis ten
-  // atrodo kaip artefaktas „(" (juodas apskritimas iškąstas baltu). Didžioji orų ikona mėnulį pasilieka.
-  if (IconSize != LargeIcon) return;
-  fillCircle(x - 85, y - 100, uint16_t(scale * 0.8), Black);
-  fillCircle(x - 57, y - 100, uint16_t(scale * 1.6), White);
 }
 
 void Nodata(int x, int y, bool IconSize, String IconName) {
